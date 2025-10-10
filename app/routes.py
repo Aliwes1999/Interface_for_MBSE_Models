@@ -1,9 +1,14 @@
-from flask import current_app as app, render_template
+from flask import render_template
+from . import bp
 
-@app.route("/")
+@bp.route("/")
 def home():
     return render_template("start.html")
 
-@app.route("/create")
+@bp.route("/create")
 def create():
     return render_template("create.html")
+
+@bp.route("/hello")
+def hello():
+    return "Hello from Blueprint!"
