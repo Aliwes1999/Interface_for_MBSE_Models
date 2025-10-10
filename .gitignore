@@ -1,8 +1,12 @@
-venv/
-env/
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+
+venv/
+env/
 .env
+
 .vscode/
 .idea/
+instance/
