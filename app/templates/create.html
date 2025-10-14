@@ -1,25 +1,51 @@
-{% extends "base.html" %} {% block title %}Create Requirements{% endblock %} {%
-block content %}
+{% extends "base.html" %}
+{% block title %}Create Requirements{% endblock %}
+{% block content %}
 <h1 class="mt-5 pt-3">Create Requirements</h1>
 <p>Hier kannst du neue Anforderungen erstellen.</p>
-<!-- Hier kannst du später ein Formular einfügen -->
+
+<form method="POST" class="mb-4">
+  <div class="row">
+    <div class="col-md-3">
+      <input type="text" name="title" class="form-control" placeholder="Title" required>
+    </div>
+    <div class="col-md-3">
+      <input type="text" name="beschreibung" class="form-control" placeholder="Beschreibung" required>
+    </div>
+    <div class="col-md-3">
+      <input type="text" name="kategorie" class="form-control" placeholder="Kategorie" required>
+    </div>
+    <div class="col-md-3">
+      <button type="submit" class="btn btn-primary">Hinzufügen</button>
+    </div>
+  </div>
+</form>
+
 <table class="table table-striped mt-4">
   <thead>
     <tr>
-      <th>Nummer</th>
+      <th>ID</th>
+      <th>Title</th>
       <th>Beschreibung</th>
       <th>Kategorie</th>
       <th>Status</th>
+      <th>Aktionen</th>
     </tr>
   </thead>
   <tbody>
+    {% for req in requirements %}
     <tr>
-      <td>1</td>
-      <td>Beispielbeschreibung</td>
-      <td>Beispielkategorie</td>
-      <td>Offen</td>
+      <td>{{ req.id }}</td>
+      <td>{{ req.title }}</td>
+      <td>{{ req.beschreibung }}</td>
+      <td>{{ req.kategorie }}</td>
+      <td>{{ req.status }}</td>
+      <td>
+        <a href="{{ url_for('main.mark', req_id=req.id) }}" class="btn btn-warning btn-sm">Markieren</a>
+        <a href="{{ url_for('main.delete', req_id=req.id) }}" class="btn btn-danger btn-sm">Löschen</a>
+      </td>
     </tr>
-    <!-- Weitere Zeilen können hier ergänzt werden -->
+    {% endfor %}
   </tbody>
 </table>
 {% endblock %}
