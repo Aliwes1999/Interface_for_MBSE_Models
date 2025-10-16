@@ -4,4 +4,19 @@ content %}
 <p class="lead">
   Dies ist eine einfache Flask-Anwendung mit Bootstrap-Integration.
 </p>
+
+<!-- List of Projects -->
+{% if projects %}
+<h2>Projekte</h2>
+<ul class="list-group mb-4">
+  {% for p in projects %}
+  <li class="list-group-item d-flex justify-content-between align-items-center">
+    {{ p.name }}
+    <a href="{{ url_for('main.manage_project', project_id=p.id) }}" class="btn btn-secondary btn-sm">Verwalten</a>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<a href="{{ url_for('main.create') }}" class="btn btn-primary">Neues Projekt erstellen</a>
 {% endblock %}
