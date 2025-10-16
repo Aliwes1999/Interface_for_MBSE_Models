@@ -1,5 +1,7 @@
-# TODO for Adding, Marking, and Deleting Entries in create.html
+# TODO for Implementing Three Independent Tables for Requirements Management
 
-- [x] Update app/routes.py: Add global list for requirements, modify /create to handle GET (display) and POST (add new entry), add /mark/<id> and /delete/<id> routes.
-- [x] Update app/templates/create.html: Add a form to add new entries, modify table to dynamically display entries with mark (toggle status) and delete buttons.
-- [x] Run the app and test adding, marking, and deleting entries.
+- [ ] Update app/routes.py: Change data structure to have 'created', 'intermediate', 'saved', 'deleted' lists instead of 'requirements'.
+- [ ] Update app/templates/create.html: Add tabs for three tables (Erstellt, Zwischengespeichert, Gespeichert), each with specific actions menu.
+- [ ] Add new routes in app/routes.py: For moving requirements between tables (save, intermediate, delete), edit modal/form, export to Excel/PDF.
+- [ ] Update requirements.txt: Add openpyxl and reportlab for export functionality.
+- [ ] Test the app: Create projects, add requirements, move between tables, edit, export.

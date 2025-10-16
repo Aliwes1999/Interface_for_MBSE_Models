@@ -1,51 +1,350 @@
 {% extends "base.html" %}
-{% block title %}Create Requirements{% endblock %}
+{% block title %}Manage Project{% endblock %}
 {% block content %}
-<h1 class="mt-5 pt-3">Create Requirements</h1>
-<p>Hier kannst du neue Anforderungen erstellen.</p>
+{% if not project %}
+<h1 class="mt-5 pt-3">Neues Projekt erstellen</h1>
+<p>Hier kannst du neue Projekte erstellen.</p>
 
+<!-- Project Creation Form -->
 <form method="POST" class="mb-4">
   <div class="row">
-    <div class="col-md-3">
-      <input type="text" name="title" class="form-control" placeholder="Title" required>
+    <div class="col-md-9">
+      <input
+        type="text"
+        name="project_name"
+        class="form-control"
+        placeholder="Projektname"
+        required
+      />
     </div>
     <div class="col-md-3">
-      <input type="text" name="beschreibung" class="form-control" placeholder="Beschreibung" required>
-    </div>
-    <div class="col-md-3">
-      <input type="text" name="kategorie" class="form-control" placeholder="Kategorie" required>
-    </div>
-    <div class="col-md-3">
-      <button type="submit" class="btn btn-primary">Hinzufügen</button>
+      <button type="submit" class="btn btn-primary">Projekt erstellen</button>
     </div>
   </div>
 </form>
 
-<table class="table table-striped mt-4">
+<a href="{{ url_for('main.home') }}" class="btn btn-secondary"
+  >Zurück zur Startseite</a
+>
+{% else %}
+<script>
+const columns = JSON.parse('{{ project.columns | tojson }}');
+
+function enableEdit(button) {
+  const reqId = button.getAttribute('data-req-id');
+  const table = button.getAttribute('data-table');
+  const row = document.querySelector(`#row-${reqId}`);
+  const cells = row.querySelectorAll('td:not(:last-child)');
+  cells.forEach(cell => {
+    const text = cell.textContent;
+    cell.innerHTML = `<input type="text" value="${text}" class="form-control">`;
+  });
+  const actionsCell = row.querySelector('td:last-child');
+  actionsCell.innerHTML = `
+    <button class="btn btn-success" onclick="saveEdit('${reqId}', '${table}')">Speichern</button>
+    <button class="btn btn-warning" onclick="intermediateEdit('${reqId}', '${table}')">Zwischenspeichern</button>
+    <button class="btn btn-secondary" onclick="cancelEdit('${reqId}', '${table}')">Abbrechen</button>
+  `;
+}
+
+function saveEdit(reqId, table) {
+  const row = document.querySelector(`#row-${reqId}`);
+  const inputs = row.querySelectorAll('input');
+  const formData = new FormData();
+  inputs.forEach((input, index) => {
+    formData.append(columns[index], input.value);
+  });
+  fetch('/edit/{{ project.id }}/' + reqId, {
+    method: 'POST',
+    body: formData
+  }).then(() => {
+    window.location.href = '/move/{{ project.id }}/' + reqId + '/' + table + '/saved';
+  });
+}
+
+function intermediateEdit(reqId, table) {
+  const row = document.querySelector(`#row-${reqId}`);
+  const inputs = row.querySelectorAll('input');
+  const formData = new FormData();
+  inputs.forEach((input, index) => {
+    formData.append(columns[index], input.value);
+  });
+  fetch('/edit/{{ project.id }}/' + reqId, {
+    method: 'POST',
+    body: formData
+  }).then(() => {
+    window.location.href = '/move/{{ project.id }}/' + reqId + '/' + table + '/intermediate';
+  });
+}
+
+function cancelEdit(reqId, table) {
+  location.reload();
+}
+</script>
+<!-- Back to Projects -->
+<a href="{{ url_for('main.home') }}" class="btn btn-secondary mb-3"
+  >Zurück zur Startseite</a
+>
+
+<h2>Anforderungen für Projekt: {{ project.name }}</h2>
+
+<!-- Add Column Form -->
+<form method="POST" class="mb-4">
+  <div class="row">
+    <div class="col-md-9">
+      <input
+        type="text"
+        name="column_name"
+        class="form-control"
+        placeholder="Neue Spaltenname"
+        required
+      />
+    </div>
+    <div class="col-md-3">
+      <button type="submit" name="add_column" class="btn btn-secondary">
+        Spalte hinzufügen
+      </button>
+    </div>
+  </div>
+</form>
+
+<!-- Requirements Form -->
+<form method="POST" class="mb-4">
+  <div class="row">
+    {% for col in project.columns %}
+    <div class="col-md-3">
+      <input
+        type="text"
+        name="{{ col }}"
+        class="form-control"
+        placeholder="{{ col }}"
+        required
+      />
+    </div>
+    {% endfor %}
+    <div class="col-md-3">
+      <button type="submit" name="add_requirement" class="btn btn-primary">
+        Hinzufügen
+      </button>
+    </div>
+  </div>
+</form>
+
+<!-- Erstellt Table -->
+<h3>Erstellt</h3>
+<table class="table table-striped">
   <thead>
     <tr>
       <th>ID</th>
-      <th>Title</th>
-      <th>Beschreibung</th>
-      <th>Kategorie</th>
-      <th>Status</th>
+      {% for col in project.columns %}
+      <th>{{ col }}</th>
+      {% endfor %}
       <th>Aktionen</th>
     </tr>
   </thead>
   <tbody>
-    {% for req in requirements %}
-    <tr>
+    {% for req in project.created %}
+    <tr id="row-{{ req.id }}">
       <td>{{ req.id }}</td>
-      <td>{{ req.title }}</td>
-      <td>{{ req.beschreibung }}</td>
-      <td>{{ req.kategorie }}</td>
-      <td>{{ req.status }}</td>
+      {% for col in project.columns %}
+      <td>{{ req[col] }}</td>
+      {% endfor %}
       <td>
-        <a href="{{ url_for('main.mark', req_id=req.id) }}" class="btn btn-warning btn-sm">Markieren</a>
-        <a href="{{ url_for('main.delete', req_id=req.id) }}" class="btn btn-danger btn-sm">Löschen</a>
+        <div class="dropdown">
+          <button
+            class="btn btn-secondary dropdown-toggle"
+            type="button"
+            id="dropdownCreated{{ req.id }}"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+          >
+            &#x22EE;
+          </button>
+          <ul
+            class="dropdown-menu"
+            aria-labelledby="dropdownCreated{{ req.id }}"
+          >
+            <li>
+              <button
+                class="dropdown-item text-primary"
+                data-req-id="{{ req.id }}"
+                data-table="created"
+                onclick="enableEdit(this)"
+                >Bearbeiten</button
+              >
+            </li>
+            <li>
+              <a
+                class="dropdown-item text-success"
+                href="{{ url_for('main.move_requirement', project_id=project.id, req_id=req.id, from_table='created', to_table='saved') }}"
+                >Speichern</a
+              >
+            </li>
+            <li>
+              <a
+                class="dropdown-item text-warning"
+                href="{{ url_for('main.move_requirement', project_id=project.id, req_id=req.id, from_table='created', to_table='intermediate') }}"
+                >Zwischenspeichern</a
+              >
+            </li>
+            <li>
+              <a
+                class="dropdown-item text-danger"
+                href="{{ url_for('main.move_requirement', project_id=project.id, req_id=req.id, from_table='created', to_table='deleted') }}"
+                >Löschen</a
+              >
+            </li>
+          </ul>
+        </div>
       </td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
-{% endblock %}
+
+<!-- Zwischengespeichert Table -->
+<h3>Zwischengespeichert</h3>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>ID</th>
+      {% for col in project.columns %}
+      <th>{{ col }}</th>
+      {% endfor %}
+      <th>Aktionen</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for req in project.intermediate %}
+    <tr id="row-{{ req.id }}">
+      <td>{{ req.id }}</td>
+      {% for col in project.columns %}
+      <td>{{ req[col] }}</td>
+      {% endfor %}
+      <td>
+        <div class="dropdown">
+          <button
+            class="btn btn-secondary dropdown-toggle"
+            type="button"
+            id="dropdownIntermediate{{ req.id }}"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+          >
+            &#x22EE;
+          </button>
+          <ul
+            class="dropdown-menu"
+            aria-labelledby="dropdownIntermediate{{ req.id }}"
+          >
+            <li>
+              <button
+                class="dropdown-item text-primary"
+                data-req-id="{{ req.id }}"
+                data-table="intermediate"
+                onclick="enableEdit(this)"
+                >Bearbeiten</button
+              >
+            </li>
+            <li>
+              <a
+                class="dropdown-item text-success"
+                href="{{ url_for('main.move_requirement', project_id=project.id, req_id=req.id, from_table='intermediate', to_table='saved') }}"
+                >Speichern</a
+              >
+            </li>
+            <li>
+              <a
+                class="dropdown-item text-danger"
+                href="{{ url_for('main.move_requirement', project_id=project.id, req_id=req.id, from_table='intermediate', to_table='deleted') }}"
+                >Löschen</a
+              >
+            </li>
+          </ul>
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<!-- Gespeichert Table -->
+<h3>Gespeichert</h3>
+<div class="mb-3">
+  <a
+    href="{{ url_for('main.export_requirements', project_id=project.id, format='excel') }}"
+    class="btn btn-success"
+    >Export als Excel</a
+  >
+  <a
+    href="{{ url_for('main.export_requirements', project_id=project.id, format='pdf') }}"
+    class="btn btn-info"
+    >Export als PDF</a
+  >
+</div>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>ID</th>
+      {% for col in project.columns %}
+      <th>{{ col }}</th>
+      {% endfor %}
+      <th>Aktionen</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for req in project.saved %}
+    <tr>
+      <td>{{ req.id }}</td>
+      {% for col in project.columns %}
+      <td>{{ req[col] }}</td>
+      {% endfor %}
+      <td>
+        <div class="dropdown">
+          <button
+            class="btn btn-secondary dropdown-toggle"
+            type="button"
+            id="dropdownSaved{{ req.id }}"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+          >
+            &#x22EE;
+          </button>
+          <ul class="dropdown-menu" aria-labelledby="dropdownSaved{{ req.id }}">
+            <li>
+              <a
+                class="dropdown-item text-danger"
+                href="{{ url_for('main.move_requirement', project_id=project.id, req_id=req.id, from_table='saved', to_table='deleted') }}"
+                >Löschen</a
+              >
+            </li>
+          </ul>
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<!-- Gelöscht Table -->
+<h3>Gelöscht</h3>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>ID</th>
+      {% for col in project.columns %}
+      <th>{{ col }}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for req in project.deleted %}
+    <tr>
+      <td>{{ req.id }}</td>
+      {% for col in project.columns %}
+      <td>{{ req[col] }}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %} {% endblock %}
