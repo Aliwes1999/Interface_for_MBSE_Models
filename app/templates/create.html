@@ -132,6 +132,7 @@ function cancelEdit(reqId, table) {
 
 <!-- Erstellt Table -->
 <h3>Erstellt</h3>
+<div class="table-section">
 <table class="table table-striped">
   <thead>
     <tr>
@@ -201,9 +202,11 @@ function cancelEdit(reqId, table) {
     {% endfor %}
   </tbody>
 </table>
+</div>
 
 <!-- Zwischengespeichert Table -->
 <h3>Zwischengespeichert</h3>
+<div class="table-section">
 <table class="table table-striped">
   <thead>
     <tr>
@@ -266,9 +269,11 @@ function cancelEdit(reqId, table) {
     {% endfor %}
   </tbody>
 </table>
+</div>
 
 <!-- Gespeichert Table -->
 <h3>Gespeichert</h3>
+<div class="table-section">
 <div class="mb-3">
   <a
     href="{{ url_for('main.export_requirements', project_id=project.id, format='excel') }}"
@@ -324,9 +329,11 @@ function cancelEdit(reqId, table) {
     {% endfor %}
   </tbody>
 </table>
+</div>
 
 <!-- Gelöscht Table -->
 <h3>Gelöscht</h3>
+<div class="table-section">
 <table class="table table-striped">
   <thead>
     <tr>
@@ -347,4 +354,5 @@ function cancelEdit(reqId, table) {
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% endif %} {% endblock %}
