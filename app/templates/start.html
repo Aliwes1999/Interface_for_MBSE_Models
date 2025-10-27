@@ -12,7 +12,12 @@ content %}
   {% for p in projects %}
   <li class="list-group-item d-flex justify-content-between align-items-center">
     {{ p.name }}
-    <a href="{{ url_for('main.manage_project', project_id=p.id) }}" class="btn btn-secondary btn-sm">Verwalten</a>
+    <div>
+      <a href="{{ url_for('main.manage_project', project_id=p.id) }}" class="btn btn-secondary btn-sm">Verwalten</a>
+      <form action="{{ url_for('main.delete_project', project_id=p.id) }}" method="post" style="display: inline;" onsubmit="return confirm('Sind Sie sicher, dass Sie dieses Projekt löschen möchten?');">
+        <button type="submit" class="btn btn-danger btn-sm">Löschen</button>
+      </form>
+    </div>
   </li>
   {% endfor %}
 </ul>

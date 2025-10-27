@@ -159,3 +159,11 @@ def add_requirement():
         db.session.add(new_req)
         db.session.commit()
     return redirect(url_for('main.list_requirements'))
+
+@bp.route("/delete/<int:project_id>", methods=['POST'])
+def delete_project(project_id):
+    project = Project.query.get_or_404(project_id)
+    db.session.delete(project)
+    db.session.commit()
+    flash('Projekt erfolgreich gelöscht.', 'success')
+    return redirect(url_for('main.home'))
