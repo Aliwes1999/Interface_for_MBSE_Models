@@ -1,0 +1,30 @@
+/* Custom styles for table enhancements */
+.table-section {
+    margin-top: 2rem; /* Abstand zwischen Tabellen */
+    border: 1px solid #ddd; /* Sichtbarer Rahmen */
+    padding: 1rem; /* Innenabstand */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Leichter Schatten */
+    border-radius: 8px; /* Abgerundete Ecken */
+    background-color: #f8f9fa; /* Heller grauer Hintergrund für bessere Übersichtlichkeit */
+}
+
+.table-section h3 {
+    font-size: 1.5rem; /* Größere Überschriften */
+    font-weight: bold; /* Fett */
+    margin-bottom: 1rem;
+}
+
+/* Zusätzliche feine Rahmen für Zellen, falls table-bordered nicht ausreicht */
+.table-bordered th,
+.table-bordered td {
+    border: 1px solid #dee2e6; /* Feine Rahmenlinien */
+}
+
+/* Abwechselnde Zeilenfarben, falls table-striped nicht reicht */
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: rgba(0, 0, 0, 0.05); /* Hellgrau für ungerade Zeilen */
+}
+
+.table-striped tbody tr:nth-of-type(even) {
+    background-color: #ffffff; /* Weiß für gerade Zeilen */
+}
