@@ -28,7 +28,7 @@
 >
 {% else %}
 <script>
-const columns = JSON.parse('{{ project.columns | tojson }}');
+const columnList = {{ columns | tojson }};
 
 function enableEdit(button) {
   const reqId = button.getAttribute('data-req-id');
@@ -52,7 +52,7 @@ function saveEdit(reqId, table) {
   const inputs = row.querySelectorAll('input');
   const formData = new FormData();
   inputs.forEach((input, index) => {
-    formData.append(columns[index], input.value);
+    formData.append(columnList[index], input.value);
   });
   fetch('/edit/{{ project.id }}/' + reqId, {
     method: 'POST',
@@ -67,7 +67,7 @@ function intermediateEdit(reqId, table) {
   const inputs = row.querySelectorAll('input');
   const formData = new FormData();
   inputs.forEach((input, index) => {
-    formData.append(columns[index], input.value);
+    formData.append(columnList[index], input.value);
   });
   fetch('/edit/{{ project.id }}/' + reqId, {
     method: 'POST',
@@ -111,7 +111,7 @@ function cancelEdit(reqId, table) {
 <!-- Requirements Form -->
 <form method="POST" class="mb-4">
   <div class="row">
-    {% for col in project.columns %}
+    {% for col in columns %}
     <div class="col-md-3">
       <input
         type="text"
@@ -136,17 +136,17 @@ function cancelEdit(reqId, table) {
   <thead>
     <tr>
       <th>ID</th>
-      {% for col in project.columns %}
+      {% for col in columns %}
       <th>{{ col }}</th>
       {% endfor %}
       <th>Aktionen</th>
     </tr>
   </thead>
   <tbody>
-    {% for req in project.created %}
+    {% for req in created %}
     <tr id="row-{{ req.id }}">
       <td>{{ req.id }}</td>
-      {% for col in project.columns %}
+      {% for col in columns %}
       <td>{{ req[col] }}</td>
       {% endfor %}
       <td>
@@ -208,17 +208,17 @@ function cancelEdit(reqId, table) {
   <thead>
     <tr>
       <th>ID</th>
-      {% for col in project.columns %}
+      {% for col in columns %}
       <th>{{ col }}</th>
       {% endfor %}
       <th>Aktionen</th>
     </tr>
   </thead>
   <tbody>
-    {% for req in project.intermediate %}
+    {% for req in intermediate %}
     <tr id="row-{{ req.id }}">
       <td>{{ req.id }}</td>
-      {% for col in project.columns %}
+      {% for col in columns %}
       <td>{{ req[col] }}</td>
       {% endfor %}
       <td>
@@ -285,17 +285,17 @@ function cancelEdit(reqId, table) {
   <thead>
     <tr>
       <th>ID</th>
-      {% for col in project.columns %}
+      {% for col in columns %}
       <th>{{ col }}</th>
       {% endfor %}
       <th>Aktionen</th>
     </tr>
   </thead>
   <tbody>
-    {% for req in project.saved %}
+    {% for req in saved %}
     <tr>
       <td>{{ req.id }}</td>
-      {% for col in project.columns %}
+      {% for col in columns %}
       <td>{{ req[col] }}</td>
       {% endfor %}
       <td>
@@ -331,16 +331,16 @@ function cancelEdit(reqId, table) {
   <thead>
     <tr>
       <th>ID</th>
-      {% for col in project.columns %}
+      {% for col in columns %}
       <th>{{ col }}</th>
       {% endfor %}
     </tr>
   </thead>
   <tbody>
-    {% for req in project.deleted %}
+    {% for req in deleted %}
     <tr>
       <td>{{ req.id }}</td>
-      {% for col in project.columns %}
+      {% for col in columns %}
       <td>{{ req[col] }}</td>
       {% endfor %}
     </tr>
