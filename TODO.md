@@ -1,4 +1,5 @@
-- [x] Schließe <div class="table-section"> nach der Erstellt-Tabelle
-- [x] Schließe <div class="table-section"> nach der Zwischengespeichert-Tabelle
-- [x] Schließe <div class="table-section"> nach der Gespeichert-Tabelle
-- [x] Schließe <div class="table-section"> nach der Gelöscht-Tabelle
+# TODO for Adding Delete Functionality to Projects
+
+- [x] Add delete route in app/routes.py for /delete/<int:project_id>
+- [x] Update app/templates/start.html to include delete button with confirm for each project
+- [x] Test the delete functionality (optional, if needed)
