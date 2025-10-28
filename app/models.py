@@ -1,6 +1,26 @@
 import json
+from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import UserMixin
 
 from . import db
+
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    projects = db.relationship('Project', backref='user', lazy=True)
+
+    def __repr__(self):
+        return f'<User {self.email}>'
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
 class Requirement(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -20,6 +40,7 @@ class Project(db.Model):
     intermediate_requirements = db.Column(db.Text, nullable=False, default='[]')
     saved_requirements = db.Column(db.Text, nullable=False, default='[]')
     deleted_requirements = db.Column(db.Text, nullable=False, default='[]')
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
     def __repr__(self):
         return f'<Project {self.name}>'
