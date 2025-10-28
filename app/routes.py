@@ -1,4 +1,5 @@
-from flask import render_template, request, redirect, url_for, flash, send_file
+from flask import render_template, request, redirect, url_for, flash, send_file, abort
+from flask_login import login_required, current_user
 from . import bp, db
 from .models import Requirement, Project
 import openpyxl
@@ -7,16 +8,18 @@ from reportlab.pdfgen import canvas
 import io
 
 @bp.route("/")
+@login_required
 def home():
-    projects = Project.query.all()
+    projects = Project.query.filter_by(user_id=current_user.id).all()
     return render_template("start.html", projects=projects)
 
 @bp.route("/create", methods=['GET', 'POST'])
+@login_required
 def create():
     if request.method == 'POST':
         project_name = request.form.get('project_name')
         if project_name:
-            new_project = Project(name=project_name)
+            new_project = Project(name=project_name, user_id=current_user.id)
             new_project.set_columns(['Title', 'Beschreibung', 'Kategorie', 'Status'])
             db.session.add(new_project)
             db.session.commit()
@@ -24,9 +27,12 @@ def create():
     return render_template("create.html")
 
 @bp.route("/project/<int:project_id>", methods=['GET', 'POST'])
+@login_required
 def manage_project(project_id):
     project = Project.query.get_or_404(project_id)
-    projects = Project.query.all()
+    if project.user_id != current_user.id:
+        abort(403)
+    projects = Project.query.filter_by(user_id=current_user.id).all()
     columns = project.get_columns()
     created = project.get_created_requirements()
     intermediate = project.get_intermediate_requirements()
@@ -58,8 +64,11 @@ def manage_project(project_id):
     return render_template("create.html", projects=projects, project=project, columns=columns, created=created, intermediate=intermediate, saved=saved, deleted=deleted)
 
 @bp.route("/move/<int:project_id>/<int:req_id>/<string:from_table>/<string:to_table>")
+@login_required
 def move_requirement(project_id, req_id, from_table, to_table):
     project = Project.query.get_or_404(project_id)
+    if project.user_id != current_user.id:
+        abort(403)
     table_map = {
         'created': 'created_requirements',
         'intermediate': 'intermediate_requirements',
@@ -79,8 +88,11 @@ def move_requirement(project_id, req_id, from_table, to_table):
     return redirect(url_for('main.manage_project', project_id=project_id))
 
 @bp.route("/edit/<int:project_id>/<int:req_id>", methods=['POST'])
+@login_required
 def edit_requirement(project_id, req_id):
     project = Project.query.get_or_404(project_id)
+    if project.user_id != current_user.id:
+        abort(403)
     table_map = {
         'created': 'created_requirements',
         'intermediate': 'intermediate_requirements',
@@ -106,8 +118,11 @@ def edit_requirement(project_id, req_id):
     return redirect(url_for('main.manage_project', project_id=project_id))
 
 @bp.route("/export/<int:project_id>/<string:format>")
+@login_required
 def export_requirements(project_id, format):
     project = Project.query.get_or_404(project_id)
+    if project.user_id != current_user.id:
+        abort(403)
     saved_reqs = project.get_saved_requirements()
     columns = project.get_columns()
     if format == 'excel':
@@ -161,8 +176,11 @@ def add_requirement():
     return redirect(url_for('main.list_requirements'))
 
 @bp.route("/delete/<int:project_id>", methods=['POST'])
+@login_required
 def delete_project(project_id):
     project = Project.query.get_or_404(project_id)
+    if project.user_id != current_user.id:
+        abort(403)
     db.session.delete(project)
     db.session.commit()
     flash('Projekt erfolgreich gelöscht.', 'success')
