@@ -36,6 +36,7 @@ class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     columns = db.Column(db.Text, nullable=False)  # JSON string for list of columns
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_requirements = db.Column(db.Text, nullable=False, default='[]')  # JSON string for list of dicts
     intermediate_requirements = db.Column(db.Text, nullable=False, default='[]')
     saved_requirements = db.Column(db.Text, nullable=False, default='[]')
