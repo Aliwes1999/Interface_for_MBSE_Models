@@ -9,6 +9,8 @@ login_manager = LoginManager()
 
 def create_app():
     app = Flask(__name__)
+    # Ensure the instance folder exists so SQLite can create the database file there
+    os.makedirs(app.instance_path, exist_ok=True)
     app.config['SECRET_KEY'] = 'your-secret-key-here'  # Add secret key for sessions
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(app.instance_path, "db.db")}'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
