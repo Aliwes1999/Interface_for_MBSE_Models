@@ -1,27 +1,149 @@
 {% extends "base.html" %} {% block title %}Startseite{% endblock %} {% block
 content %}
-<h1 class="mt-5 pt-3">Willkommen zum Requirements Management Tool</h1>
-<p class="lead">
-  Dies ist eine einfache Flask-Anwendung mit Bootstrap-Integration.
-</p>
+<style>
+  body {
+    background-color: #f8f9fa;
+  }
+  .card {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+  }
+  .stats-card {
+    text-align: center;
+  }
+  .stats-card .card-body h5 {
+    font-weight: bold;
+    color: #6c757d;
+  }
+  .stats-card .card-body .display-4 {
+    font-size: 2.5rem;
+    color: #007bff;
+  }
+  .table-box {
+    background-color: white;
+  }
+  .no-projects {
+    text-align: center;
+    padding: 2rem;
+  }
+  .no-projects i {
+    font-size: 3rem;
+    color: #6c757d;
+  }
+</style>
 
-<!-- List of Projects -->
-{% if projects %}
-<h2>Projekte</h2>
-<ul class="list-group mb-4">
-  {% for p in projects %}
-  <li class="list-group-item d-flex justify-content-between align-items-center">
-    {{ p.name }}
-    <div>
-      <a href="{{ url_for('main.manage_project', project_id=p.id) }}" class="btn btn-secondary btn-sm">Verwalten</a>
-      <form action="{{ url_for('main.delete_project', project_id=p.id) }}" method="post" style="display: inline;" onsubmit="return confirm('Sind Sie sicher, dass Sie dieses Projekt löschen möchten?');">
-        <button type="submit" class="btn btn-danger btn-sm">Löschen</button>
-      </form>
+<div class="container-fluid py-5" style="min-height: 100vh">
+  <!-- Header / Begrüßung -->
+  <div class="row mb-5">
+    <div class="col-12 text-center">
+      <h1 class="fw-bold text-secondary mb-3">
+        Willkommen zurück, {{ current_user.email }} 👋
+      </h1>
+      <p class="lead mb-4">
+        Hier kannst du deine Requirements-Projekte verwalten.
+      </p>
+      <a href="{{ url_for('main.create') }}" class="btn btn-primary btn-lg">
+        <i class="bi bi-plus-circle"></i> Neues Projekt erstellen
+      </a>
     </div>
-  </li>
-  {% endfor %}
-</ul>
-{% endif %}
+  </div>
 
-<a href="{{ url_for('main.create') }}" class="btn btn-primary">Neues Projekt erstellen</a>
+  <!-- Statistik-Karten -->
+  <div class="row mb-5">
+    <div class="col-md-4 mb-3">
+      <div class="card stats-card h-100">
+        <div class="card-body">
+          <i class="bi bi-folder-fill display-4 mb-2"></i>
+          <h5>Gesamtprojekte</h5>
+          <p class="display-4 mb-0">{{ projects|length }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 mb-3">
+      <div class="card stats-card h-100">
+        <div class="card-body">
+          <i class="bi bi-calendar-check-fill display-4 mb-2"></i>
+          <h5>Letztes Update</h5>
+          <p class="display-4 mb-0">
+            {{ projects[-1].created_at.strftime('%d.%m.%Y') if projects else "—"
+            }}
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 mb-3">
+      <div class="card stats-card h-100">
+        <div class="card-body">
+          <i class="bi bi-people-fill display-4 mb-2"></i>
+          <h5>Aktive Benutzer</h5>
+          <p class="display-4 mb-0">1 (du 😄)</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Projekttabelle -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card table-box">
+        <div class="card-header">
+          <h4 class="mb-0 fw-bold text-secondary">Deine Projekte</h4>
+        </div>
+        <div class="card-body">
+          {% if projects %}
+          <div class="table-responsive">
+            <table class="table table-hover align-middle table-striped">
+              <thead>
+                <tr>
+                  <th>Projektname</th>
+                  <th>Erstelldatum</th>
+                  <th>Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in projects %}
+                <tr>
+                  <td>
+                    <a
+                      href="{{ url_for('main.manage_project', project_id=p.id) }}"
+                      class="text-decoration-none"
+                      >{{ p.name }}</a
+                    >
+                  </td>
+                  <td>{{ p.created_at.strftime('%d.%m.%Y') }}</td>
+                  <td>
+                    <form
+                      action="{{ url_for('main.delete_project', project_id=p.id) }}"
+                      method="post"
+                      style="display: inline"
+                      onsubmit="return confirm('Sind Sie sicher, dass Sie dieses Projekt löschen möchten?');"
+                    >
+                      <button type="submit" class="btn btn-danger btn-sm">
+                        Löschen
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="no-projects">
+            <i class="bi bi-folder-x"></i>
+            <h5 class="mt-3">Noch keine Projekte vorhanden</h5>
+            <p>
+              Starte dein erstes MBSE-Projekt und verknüpfe deine Modelle
+              effizient.
+            </p>
+            <a href="{{ url_for('main.create') }}" class="btn btn-primary"
+              >Projekt erstellen</a
+            >
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
