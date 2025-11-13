@@ -24,13 +24,15 @@ class User(UserMixin, db.Model):
 
 class Requirement(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    nummer = db.Column(db.String(50), nullable=False)
-    beschreibung = db.Column(db.String(500), nullable=False)
-    kategorie = db.Column(db.String(100), nullable=False)
+    title = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.String(500), nullable=False)
+    category = db.Column(db.String(100), nullable=False)
     status = db.Column(db.String(50), nullable=False)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
-        return f'<Requirement {self.nummer}>'
+        return f'<Requirement {self.title}>'
 
 class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -42,6 +44,8 @@ class Project(db.Model):
     saved_requirements = db.Column(db.Text, nullable=False, default='[]')
     deleted_requirements = db.Column(db.Text, nullable=False, default='[]')
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+    requirements = db.relationship('Requirement', backref='project', lazy=True)
 
     def __repr__(self):
         return f'<Project {self.name}>'
