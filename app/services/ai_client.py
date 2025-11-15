@@ -9,16 +9,17 @@ from openai import OpenAI
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 import config
 
-def generate_requirements(user_description: str | None, inputs: dict) -> list[dict]:
+def generate_requirements(user_description: str | None, inputs: dict, columns: list = None) -> list[dict]:
     """
     Calls OpenAI API to generate requirements based on user description and inputs.
 
     Args:
         user_description (str | None): Optional user description of requirements.
         inputs (dict): Key-value pairs for additional context.
+        columns (list): Optional list of column names for the project.
 
     Returns:
-        list[dict]: List of requirement dicts with 'title', 'description', 'category', 'status'.
+        list[dict]: List of requirement dicts with dynamic columns based on project.
     
     Raises:
         ValueError: If OPENAI_API_KEY is not set.
@@ -27,7 +28,7 @@ def generate_requirements(user_description: str | None, inputs: dict) -> list[di
     # Get configuration
     api_key = config.OPENAI_API_KEY
     model = config.OPENAI_MODEL or "gpt-4o-mini"
-    system_prompt = config.get_system_prompt()
+    system_prompt = config.get_system_prompt(columns)
 
     if not api_key:
         raise ValueError("OPENAI_API_KEY environment variable must be set.")
@@ -52,8 +53,38 @@ def generate_requirements(user_description: str | None, inputs: dict) -> list[di
     else:
         user_message = "\n".join(user_message_parts)
 
-    # Developer message with JSON schema
-    developer_message = """Du musst ausschließlich mit gültigem JSON antworten.
+    # Build developer message with dynamic JSON schema
+    if columns and isinstance(columns, list):
+        # Build JSON structure based on columns
+        json_fields = []
+        for col in columns:
+            col_lower = col.lower()
+            if col_lower in ['titel', 'title']:
+                json_fields.append(f'      "{col}": "Kurzer, prägnanter Titel"')
+            elif col_lower in ['beschreibung', 'description']:
+                json_fields.append(f'      "{col}": "Detaillierte Beschreibung mit Akzeptanzkriterien"')
+            elif col_lower in ['kategorie', 'category']:
+                json_fields.append(f'      "{col}": "Kategorie (z.B. Funktional, Nicht-Funktional, etc.)"')
+            elif col_lower in ['status']:
+                json_fields.append(f'      "{col}": "Offen"')
+            else:
+                json_fields.append(f'      "{col}": "Passender Wert für {col}"')
+        
+        json_example = "{\n" + ",\n".join(json_fields) + "\n    }"
+        
+        developer_message = f"""Du musst ausschließlich mit gültigem JSON antworten.
+Das JSON-Format muss exakt dieser Struktur folgen:
+{{
+  "requirements": [
+    {json_example}
+  ]
+}}
+
+Wichtig: Fülle ALLE Spalten ({', '.join(columns)}) mit sinnvollen Werten.
+Antworte NUR mit diesem JSON, ohne zusätzlichen Text davor oder danach."""
+    else:
+        # Fallback to default structure
+        developer_message = """Du musst ausschließlich mit gültigem JSON antworten.
 Das JSON-Format muss exakt dieser Struktur folgen:
 {
   "requirements": [
@@ -85,7 +116,7 @@ Antworte NUR mit diesem JSON, ohne zusätzlichen Text davor oder danach."""
         response_text = response.choices[0].message.content.strip()
 
         # Parse JSON response
-        requirements = _parse_json_response(response_text)
+        requirements = _parse_json_response(response_text, columns)
         
         return requirements
 
@@ -93,12 +124,13 @@ Antworte NUR mit diesem JSON, ohne zusätzlichen Text davor oder danach."""
         raise RuntimeError(f"OpenAI request failed: {str(e)}")
 
 
-def _parse_json_response(response_text: str) -> list[dict]:
+def _parse_json_response(response_text: str, columns: list = None) -> list[dict]:
     """
     Robustly parse JSON response from OpenAI, with fallback to regex extraction.
 
     Args:
         response_text (str): Raw response text from OpenAI.
+        columns (list): Optional list of column names for validation.
 
     Returns:
         list[dict]: List of validated and normalized requirement dicts.
@@ -110,7 +142,7 @@ def _parse_json_response(response_text: str) -> list[dict]:
     try:
         data = json.loads(response_text)
         if isinstance(data, dict) and "requirements" in data:
-            return _validate_and_normalize_requirements(data["requirements"])
+            return _validate_and_normalize_requirements(data["requirements"], columns)
     except json.JSONDecodeError:
         pass
 
@@ -126,7 +158,7 @@ def _parse_json_response(response_text: str) -> list[dict]:
         try:
             data = json.loads(match)
             if isinstance(data, dict) and "requirements" in data:
-                return _validate_and_normalize_requirements(data["requirements"])
+                return _validate_and_normalize_requirements(data["requirements"], columns)
         except json.JSONDecodeError:
             continue
 
@@ -138,19 +170,20 @@ def _parse_json_response(response_text: str) -> list[dict]:
         try:
             data = json.loads(match)
             if isinstance(data, list):
-                return _validate_and_normalize_requirements(data)
+                return _validate_and_normalize_requirements(data, columns)
         except json.JSONDecodeError:
             continue
 
     raise RuntimeError("Invalid JSON response from model: Could not parse requirements structure.")
 
 
-def _validate_and_normalize_requirements(requirements: list) -> list[dict]:
+def _validate_and_normalize_requirements(requirements: list, columns: list = None) -> list[dict]:
     """
-    Validate and normalize requirements list.
+    Validate and normalize requirements list with support for dynamic columns.
 
     Args:
         requirements (list): Raw requirements list from parsed JSON.
+        columns (list): Optional list of column names to validate against.
 
     Returns:
         list[dict]: Validated and normalized requirements.
@@ -167,27 +200,44 @@ def _validate_and_normalize_requirements(requirements: list) -> list[dict]:
         if not isinstance(req, dict):
             continue
         
-        # Extract and validate required fields
-        title = req.get("title", "").strip()
-        description = req.get("description", "").strip()
-        
-        if not title or not description:
-            continue  # Skip invalid requirements
-        
-        # Set defaults for optional fields
-        category = req.get("category", "").strip()
-        status = req.get("status", "Offen").strip()
-        
-        # Ensure status is "Offen" as per requirements
-        if status != "Offen":
-            status = "Offen"
-        
-        normalized.append({
-            "title": title,
-            "description": description,
-            "category": category,
-            "status": status
-        })
+        # If columns are provided, use them for validation
+        if columns and isinstance(columns, list):
+            normalized_req = {}
+            has_required_data = False
+            
+            for col in columns:
+                value = req.get(col, "").strip()
+                normalized_req[col] = value
+                
+                # Check if we have at least some meaningful data
+                if value:
+                    has_required_data = True
+            
+            # Only add if we have at least some data
+            if has_required_data:
+                normalized.append(normalized_req)
+        else:
+            # Fallback to default validation (backward compatibility)
+            title = req.get("title", "").strip()
+            description = req.get("description", "").strip()
+            
+            if not title or not description:
+                continue  # Skip invalid requirements
+            
+            # Set defaults for optional fields
+            category = req.get("category", "").strip()
+            status = req.get("status", "Offen").strip()
+            
+            # Ensure status is "Offen" as per requirements
+            if status != "Offen":
+                status = "Offen"
+            
+            normalized.append({
+                "title": title,
+                "description": description,
+                "category": category,
+                "status": status
+            })
     
     if not normalized:
         raise RuntimeError("No valid requirements found in response.")
