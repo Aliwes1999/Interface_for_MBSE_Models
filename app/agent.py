@@ -69,41 +69,33 @@ def generate(project_id):
                 if key and value:
                     inputs_dict[key] = value
 
-    # Generate requirements using AI
-    try:
-        requirements_data = generate_requirements(user_description, inputs_dict)
+    # Get project columns for dynamic AI generation
+    columns = project.get_columns()
 
-        # Save requirements to database
+    # Generate requirements using AI with dynamic columns
+    try:
+        requirements_data = generate_requirements(user_description, inputs_dict, columns)
+
+        # Get current created requirements to determine next ID
+        created = project.get_created_requirements()
+        next_id = max([r['id'] for r in created] + [0]) + 1
+
+        # Add generated requirements to created list with all columns
         saved_count = 0
         for req_data in requirements_data:
-            new_req = Requirement(
-                title=req_data.get('title', ''),
-                description=req_data.get('description', ''),
-                category=req_data.get('category', ''),
-                status='Offen',  # Always set to "Offen" as per requirements
-                project_id=project_id
-            )
-            db.session.add(new_req)
+            new_req = {'id': next_id}
+            
+            # Fill in all columns from AI response
+            for col in columns:
+                # Get value from AI response, default to empty string
+                new_req[col] = req_data.get(col, '')
+            
+            created.append(new_req)
+            next_id += 1
             saved_count += 1
 
-        db.session.commit()
-
-        # Sync requirements to project's JSON fields for frontend display
-        project_requirements = Requirement.query.filter_by(project_id=project_id).all()
-        created_list = []
-        for req in project_requirements:
-            created_list.append({
-                'id': req.id,
-                'Title': req.title,
-                'Beschreibung': req.description,
-                'Kategorie': req.category,
-                'Status': req.status
-            })
-        project.set_created_requirements(created_list)
-        # Clear other JSON fields if needed, or keep as is
-        project.set_intermediate_requirements([])
-        project.set_saved_requirements([])
-        project.set_deleted_requirements([])
+        # Save updated created requirements
+        project.set_created_requirements(created)
         db.session.commit()
 
         # Return success response with redirect URL

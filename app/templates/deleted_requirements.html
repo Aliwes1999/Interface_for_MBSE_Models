@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Gelöschte Requirements - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Gelöschte Requirements für das Projekt "{{ project.name }}"</h1>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Gelöschte Requirements</h2>
+        </div>
+        <div class="card-body">
+            {% if project.get_deleted_requirements() %}
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                {% for col in project.get_columns() %}
+                                    <th>{{ col }}</th>
+                                {% endfor %}
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in project.get_deleted_requirements() %}
+                                <tr>
+                                    {% for col in project.get_columns() %}
+                                        <td>{{ req[col] }}</td>
+                                    {% endfor %}
+                                    <td>
+                                        <a href="{{ url_for('main.move_requirement', project_id=project.id, req_id=req.id, from_table='deleted', to_table='created') }}" class="btn btn-success btn-sm">Wiederherstellen</a>
+                                        <form action="{{ url_for('main.delete_requirement_permanently', project_id=project.id, req_id=req.id) }}" method="post" style="display: inline;" id="delete-form-{{ req.id }}">
+                                            <button type="button" class="btn btn-danger btn-sm" onclick="showConfirmModal('Sind Sie sicher, dass Sie dieses Requirement endgültig löschen möchten?', () => document.getElementById('delete-form-{{ req.id }}').submit());">
+                                                Permanent löschen
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-center">Keine gelöschten Requirements gefunden.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <a href="{{ url_for('main.manage_project', project_id=project.id) }}" class="btn btn-secondary">Zurück zum Projekt</a>
+    </div>
+</div>
+{% endblock %}
