@@ -1,6 +1,15 @@
 {% extends "base.html" %} {% block title %}KI-Agent für {{ project.name }}{%
 endblock %} {% block content %}
 <div class="container mt-5">
+  <div class="mb-3">
+    <a
+      href="{{ url_for('main.manage_project', project_id=project.id) }}"
+      class="btn btn-secondary"
+    >
+      <i class="bi bi-arrow-left"></i> Zurück zum Projekt
+    </a>
+  </div>
+
   <h1 class="mb-4">KI-Agent für Projekt: {{ project.name }}</h1>
   <p class="mb-4">
     Generiere Requirements mit Hilfe von KI. Gib eine optionale Beschreibung und

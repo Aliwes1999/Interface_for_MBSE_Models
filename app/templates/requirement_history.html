@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Version History{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('main.manage_project', project_id=req.project_id) }}" class="btn btn-secondary mb-3">
+  Back to Project
+</a>
+
+<h2 class="mt-4 mb-4">History for Requirement #{{ req.id }}</h2>
+
+<div class="card">
+  <div class="card-header">
+    All Versions
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 5%;">Version</th>
+            <th style="width: 20%;">Title</th>
+            <th style="width: 45%;">Description</th>
+            <th style="width: 15%;">Category</th>
+            <th style="width: 15%;">Created At</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if versions %}
+            {% for ver in versions %}
+            <tr>
+              <td>
+                <span class="badge bg-primary">{{ ver.version_label }}</span>
+              </td>
+              <td>{{ ver.title }}</td>
+              <td>{{ ver.description }}</td>
+              <td>{{ ver.category or "–" }}</td>
+              <td>{{ ver.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="5" class="text-center">
+                No versions found for this requirement.
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

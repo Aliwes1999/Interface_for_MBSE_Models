@@ -29,6 +29,10 @@ def create_app():
     app.register_blueprint(bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(agent_bp)
+
+    from .migration import migration_bp
+    app.register_blueprint(migration_bp)
+    
     return app
 
 @login_manager.user_loader
