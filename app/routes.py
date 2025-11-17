@@ -292,30 +292,28 @@ def update_requirement_version(version_id):
 def delete_requirement_version(version_id):
     version = RequirementVersion.query.get_or_404(version_id)
     req = version.requirement
-    
+
     # Authorization check
     if req.project.user_id != current_user.id:
         abort(403)
-    
+
     project_id = req.project_id
-    
-    # Delete this specific version
-    db.session.delete(version)
-    db.session.flush()
-    
+
     # Check if there are any remaining versions
     remaining_versions = RequirementVersion.query.filter_by(requirement_id=req.id).count()
-    
-    if remaining_versions == 0:
-        # No more versions, mark the requirement as deleted
+
+    if remaining_versions == 1:
+        # This is the last version, mark the requirement as deleted instead of deleting the version
         req.is_deleted = True
         flash("Last version deleted. Requirement moved to trash.", "success")
     else:
+        # Delete this specific version
+        db.session.delete(version)
         flash(f"Version {version.version_label} deleted successfully.", "success")
-    
+
     db.session.commit()
-    
-    return redirect(url_for('main.manage_project', project_id=project_id))
+
+    return redirect(url_for('main.deleted_requirements_overview'))
 
 # Route to soft delete a requirement (kept for compatibility, but marks all versions as deleted)
 @bp.route("/requirement/<int:req_id>/delete", methods=['POST'])
@@ -325,13 +323,13 @@ def delete_requirement(req_id):
     # Authorization check
     if req.project.user_id != current_user.id:
         abort(403)
-    
+
     # Soft delete
     req.is_deleted = True
     db.session.commit()
-    
+
     flash("Requirement moved to trash.", "success")
-    return redirect(url_for('main.manage_project', project_id=req.project_id))
+    return redirect(url_for('main.deleted_requirements_overview'))
 
 # Route to restore a deleted requirement
 @bp.route("/requirement/<int:req_id>/restore", methods=['POST'])
