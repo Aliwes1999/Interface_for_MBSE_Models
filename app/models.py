@@ -135,6 +135,15 @@ class RequirementVersion(db.Model):
         except:
             return {}
     
+    def get_custom_data_json(self):
+        """Get custom column data as properly escaped JSON string for HTML attributes."""
+        import json
+        import html
+        data = self.get_custom_data()
+        json_str = json.dumps(data)
+        # Escape for HTML attribute - replace quotes with HTML entities
+        return html.escape(json_str, quote=True)
+    
     def set_custom_data(self, data):
         """Set custom column data."""
         import json

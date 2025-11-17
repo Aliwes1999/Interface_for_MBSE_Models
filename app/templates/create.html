@@ -384,7 +384,7 @@ content %} {% if not project %}
                   data-category="{{ ver.category or '' }}"
                   data-status="{{ ver.status }}"
                   data-status-color="{{ ver.get_status_color() }}"
-                  data-custom-data="{{ ver.get_custom_data()|tojson }}"
+                  data-custom-data="{{ ver.get_custom_data_json()|safe }}"
                 ></div>
                 {% endfor %}
               </div>
