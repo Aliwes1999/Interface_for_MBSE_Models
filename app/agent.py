@@ -1,10 +1,29 @@
+import re
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, abort
 from flask_login import login_required, current_user
 from . import db
-from .models import Project, Requirement
+from .models import Project, Requirement, RequirementVersion, version_label
 from .services.ai_client import generate_requirements
 
 agent_bp = Blueprint('agent', __name__, template_folder='templates/agent')
+
+def normalize_key(title: str) -> str:
+    """Creates a stable, lowercase key from a title string."""
+    if not title:
+        return ""
+    s = title.strip().lower()
+    s = re.sub(r"\s+", " ", s)
+    return s
+
+def next_version_info(req: Requirement) -> tuple[int, str]:
+    """Determines the next version index and label for a requirement."""
+    if not req.versions:
+        return 1, version_label(1)
+    # The versions are ordered by version_index, so the last one is the latest.
+    last_idx = req.versions[-1].version_index
+    new_idx = last_idx + 1
+    return new_idx, version_label(new_idx)
+
 
 @agent_bp.route('/agent/<int:project_id>', methods=['GET'])
 @login_required
@@ -16,39 +35,19 @@ def agent_page(project_id):
     project = Project.query.get_or_404(project_id)
     if project.user_id != current_user.id:
         abort(403)
-    return render_template('agent/agent.html', project=project)
+    return render_template('agent.html', project=project)
 
 
 @agent_bp.route('/agent/generate/<int:project_id>', methods=['POST'])
 @login_required
 def generate(project_id):
     """
-    Generate requirements using AI based on user description and inputs.
-    
-    Expected JSON body:
-    {
-        "user_description": "optional string",
-        "inputs": [{"key": "...", "value": "..."}, ...]
-    }
-    
-    Returns:
-    {
-        "ok": true,
-        "count": N,
-        "redirect": "/manage/<project_id>"
-    }
-    or
-    {
-        "ok": false,
-        "error": "error message"
-    }
+    Generate requirements using AI and create versioned entries in the database.
     """
-    # Verify project ownership
     project = Project.query.get_or_404(project_id)
     if project.user_id != current_user.id:
-        return jsonify({'ok': False, 'error': 'Zugriff verweigert. Sie sind nicht der Besitzer dieses Projekts.'}), 403
+        return jsonify({'ok': False, 'error': 'Zugriff verweigert.'}), 403
 
-    # Parse request data
     try:
         data = request.get_json()
         if not data:
@@ -58,47 +57,70 @@ def generate(project_id):
 
     user_description = data.get('user_description', '').strip() or None
     inputs_array = data.get('inputs', [])
+    inputs_dict = {item.get('key'): item.get('value') for item in inputs_array if item.get('key')}
 
-    # Convert inputs array to dict
-    inputs_dict = {}
-    if isinstance(inputs_array, list):
-        for item in inputs_array:
-            if isinstance(item, dict):
-                key = item.get('key', '').strip()
-                value = item.get('value', '').strip()
-                if key and value:
-                    inputs_dict[key] = value
+    # Get project's custom columns
+    custom_columns = project.get_custom_columns()
+    
+    # Build complete columns list: title, description, custom columns, category, status
+    columns = ["title", "description"] + custom_columns + ["category", "status"]
 
-    # Get project columns for dynamic AI generation
-    columns = project.get_columns()
-
-    # Generate requirements using AI with dynamic columns
     try:
         requirements_data = generate_requirements(user_description, inputs_dict, columns)
-
-        # Get current created requirements to determine next ID
-        created = project.get_created_requirements()
-        next_id = max([r['id'] for r in created] + [0]) + 1
-
-        # Add generated requirements to created list with all columns
+        
         saved_count = 0
-        for req_data in requirements_data:
-            new_req = {'id': next_id}
+        for item in requirements_data:
+            title = item.get("title", "").strip()
+            if not title:
+                continue  # Skip requirements without a title
+
+            description = item.get("description", "").strip()
+            category = item.get("category", "") or ""
+            status = item.get("status", "") or "Offen"
             
-            # Fill in all columns from AI response
-            for col in columns:
-                # Get value from AI response, default to empty string
-                new_req[col] = req_data.get(col, '')
+            key = normalize_key(title)
+
+            # Find existing logical requirement in the current project
+            req = Requirement.query.filter_by(project_id=project_id, key=key).first()
+
+            if not req:
+                # It's a new logical requirement, create it
+                req = Requirement(project_id=project_id, key=key)
+                db.session.add(req)
+                # Flush to get the ID for the foreign key relationship
+                db.session.flush()
+                version_index, label = 1, version_label(1)
+            else:
+                # It's a new version of an existing requirement
+                version_index, label = next_version_info(req)
+
+            # Create the new version
+            new_version = RequirementVersion(
+                requirement_id=req.id,
+                version_index=version_index,
+                version_label=label,
+                title=title,
+                description=description,
+                category=category,
+                status=status,
+                created_by_id=current_user.id  # Track who created this version
+            )
             
-            created.append(new_req)
-            next_id += 1
+            # Save custom column data
+            custom_data = {}
+            for col in custom_columns:
+                value = item.get(col, "")
+                if value:
+                    custom_data[col] = value
+            
+            if custom_data:
+                new_version.set_custom_data(custom_data)
+            
+            db.session.add(new_version)
             saved_count += 1
 
-        # Save updated created requirements
-        project.set_created_requirements(created)
         db.session.commit()
 
-        # Return success response with redirect URL
         return jsonify({
             'ok': True,
             'count': saved_count,
@@ -106,23 +128,9 @@ def generate(project_id):
         }), 200
 
     except ValueError as e:
-        # Configuration error (e.g., missing API key)
-        return jsonify({
-            'ok': False,
-            'error': f'Konfigurationsfehler: {str(e)}'
-        }), 500
-
+        return jsonify({'ok': False, 'error': f'Konfigurationsfehler: {str(e)}'}), 500
     except RuntimeError as e:
-        # AI service error
-        return jsonify({
-            'ok': False,
-            'error': f'KI-Service-Fehler: {str(e)}'
-        }), 500
-
+        return jsonify({'ok': False, 'error': f'KI-Service-Fehler: {str(e)}'}), 500
     except Exception as e:
-        # Unexpected error
         db.session.rollback()
-        return jsonify({
-            'ok': False,
-            'error': f'Ein unerwarteter Fehler ist aufgetreten: {str(e)}'
-        }), 500
+        return jsonify({'ok': False, 'error': f'Ein unerwarteter Fehler ist aufgetreten: {str(e)}'}), 500
