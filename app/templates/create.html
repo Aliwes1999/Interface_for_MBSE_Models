@@ -110,9 +110,6 @@ content %} {% if not project %}
   <div class="card-body">
     <div class="mb-3">
       <span class="badge bg-secondary me-1"
-        ><i class="bi bi-lock-fill"></i> Version</span
-      >
-      <span class="badge bg-secondary me-1"
         ><i class="bi bi-lock-fill"></i> ID</span
       >
       <span class="badge bg-secondary me-1"
@@ -144,6 +141,15 @@ content %} {% if not project %}
       >
       <span class="badge bg-secondary me-1"
         ><i class="bi bi-lock-fill"></i> Status</span
+      >
+      <span class="badge bg-secondary me-1"
+        ><i class="bi bi-lock-fill"></i> Qualifizierbar</span
+      >
+      <span class="badge bg-secondary me-1"
+        ><i class="bi bi-lock-fill"></i> Funktional</span
+      >
+      <span class="badge bg-secondary me-1"
+        ><i class="bi bi-lock-fill"></i> Version</span
       >
       <span class="badge bg-secondary me-1"
         ><i class="bi bi-lock-fill"></i> Aktionen</span
@@ -241,7 +247,6 @@ content %} {% if not project %}
       <table class="table table-hover align-middle">
         <thead class="table-light">
           <tr>
-            <th style="width: 5%">Version</th>
             <th style="width: 5%">ID</th>
             <th style="width: 15%">Title</th>
             <th style="width: 20%">Beschreibung</th>
@@ -250,7 +255,10 @@ content %} {% if not project %}
             {% endfor %}
             <th style="width: 8%">Kategorie</th>
             <th style="width: 8%">Status</th>
+            <th style="width: 6%">Qualifizierbar</th>
+            <th style="width: 6%">Funktional</th>
             <th style="width: 10%">Benutzer</th>
+            <th style="width: 5%">Version</th>
             <th style="width: 20%">Aktionen</th>
           </tr>
         </thead>
@@ -258,26 +266,6 @@ content %} {% if not project %}
           {% if req_with_versions %} {% for req, versions in req_with_versions
           %}
           <tr id="req-row-{{ req.id }}" data-req-id="{{ req.id }}">
-            <td>
-              <select
-                class="form-select form-select-sm version-selector"
-                data-req-id="{{ req.id }}"
-              >
-                {% for ver in versions %}
-                <option
-                  value="{{ ver.version_index }}"
-                  {%
-                  if
-                  loop.last
-                  %}selected{%
-                  endif
-                  %}
-                >
-                  {{ ver.version_label }}
-                </option>
-                {% endfor %}
-              </select>
-            </td>
             <td>{{ loop.index }}</td>
             <td class="title-cell">{{ versions[-1].title }}</td>
             <td class="description-cell">{{ versions[-1].description }}</td>
@@ -292,6 +280,8 @@ content %} {% if not project %}
                 >{{ versions[-1].status }}</span
               >
             </td>
+            <td class="qualify-cell">{{ versions[-1].get_custom_data().get('Qualifizierbar', '–') }}</td>
+            <td class="functional-cell">{{ versions[-1].get_custom_data().get('Funktional', '–') }}</td>
             <td class="user-cell">
               {% if versions[-1].created_by %}
               <small
@@ -304,6 +294,16 @@ content %} {% if not project %}
               {% else %}
               <small class="text-muted">–</small>
               {% endif %}
+            </td>
+            <td>
+              <select
+                class="form-select form-select-sm version-selector"
+                data-req-id="{{ req.id }}"
+              >
+                {% for ver in versions %}
+                <option value="{{ ver.version_index }}" {% if loop.last %}selected{% endif %}>{{ ver.version_label }}</option>
+                {% endfor %}
+              </select>
             </td>
             <td class="actions-cell">
               <form
@@ -392,7 +392,7 @@ content %} {% if not project %}
           </tr>
           {% endfor %} {% else %}
           <tr>
-            <td colspan="{{ 8 + custom_columns|length }}" class="text-center">
+            <td colspan="{{ 10 + custom_columns|length }}" class="text-center">
               Noch keine Anforderungen vorhanden. Nutzen Sie den
               <a href="{{ url_for('agent.agent_page', project_id=project.id) }}"
                 >KI-Agenten</a
