@@ -55,18 +55,33 @@ def generate(project_id):
     except Exception:
         return jsonify({'ok': False, 'error': 'Ungültiges JSON-Format.'}), 400
 
+    machine = data.get('machine', '').strip() or None
     user_description = data.get('user_description', '').strip() or None
     inputs_array = data.get('inputs', [])
     inputs_dict = {item.get('key'): item.get('value') for item in inputs_array if item.get('key')}
+    
+    # Get custom columns from form (user-defined columns)
+    user_columns_array = data.get('columns', [])
+    user_columns_dict = {item.get('name'): item.get('value') for item in user_columns_array if item.get('name')}
 
     # Get project's custom columns
     custom_columns = project.get_custom_columns()
     
+    # Add user-defined columns to project's custom columns
+    user_defined_columns = list(user_columns_dict.keys())
+    all_custom_columns = custom_columns + user_defined_columns
+    
     # Build complete columns list: title, description, custom columns, category, status
-    columns = ["title", "description"] + custom_columns + ["category", "status"]
+    columns = ["title", "description"] + all_custom_columns + ["category", "status"]
 
     try:
-        requirements_data = generate_requirements(user_description, inputs_dict, columns)
+        requirements_data = generate_requirements(
+            machine=machine,
+            user_description=user_description,
+            inputs=inputs_dict,
+            user_columns=user_columns_dict,
+            columns=columns
+        )
         
         saved_count = 0
         for item in requirements_data:
@@ -119,6 +134,13 @@ def generate(project_id):
             db.session.add(new_version)
             saved_count += 1
 
+        # Save user-defined columns to project's custom_columns
+        if user_defined_columns:
+            current_custom = project.get_custom_columns()
+            # Merge with existing custom columns (avoid duplicates)
+            merged_columns = list(dict.fromkeys(current_custom + user_defined_columns))
+            project.set_custom_columns(merged_columns)
+        
         db.session.commit()
 
         return jsonify({

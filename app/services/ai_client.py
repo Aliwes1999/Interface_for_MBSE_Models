@@ -9,13 +9,15 @@ from openai import OpenAI
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 import config
 
-def generate_requirements(user_description: str | None, inputs: dict, columns: list = None) -> list[dict]:
+def generate_requirements(machine: str | None = None, user_description: str | None = None, inputs: dict = None, user_columns: dict = None, columns: list = None) -> list[dict]:
     """
-    Calls OpenAI API to generate requirements based on user description and inputs.
+    Calls OpenAI API to generate requirements based on machine, user description, inputs, and user-defined columns.
 
     Args:
+        machine (str | None): Optional machine/system identifier.
         user_description (str | None): Optional user description of requirements.
         inputs (dict): Key-value pairs for additional context.
+        user_columns (dict): User-defined columns with their values/examples.
         columns (list): Optional list of column names for the project.
 
     Returns:
@@ -25,6 +27,11 @@ def generate_requirements(user_description: str | None, inputs: dict, columns: l
         ValueError: If OPENAI_API_KEY is not set.
         RuntimeError: If OpenAI API call fails or response is invalid.
     """
+    if inputs is None:
+        inputs = {}
+    if user_columns is None:
+        user_columns = {}
+    
     # Get configuration
     api_key = config.OPENAI_API_KEY
     model = config.OPENAI_MODEL or "gpt-4o-mini"
@@ -36,11 +43,24 @@ def generate_requirements(user_description: str | None, inputs: dict, columns: l
     # Initialize OpenAI client
     client = OpenAI(api_key=api_key)
 
-    # Build user message from user_description and inputs
+    # Build user message from machine, user_description, user_columns and inputs
     user_message_parts = []
+    
+    if machine and machine.strip():
+        user_message_parts.append(f"Maschine/System: {machine.strip()}")
     
     if user_description and user_description.strip():
         user_message_parts.append(f"Beschreibung: {user_description.strip()}")
+    
+    if user_columns:
+        user_message_parts.append("\nBenutzerdefinierte Spalten:")
+        for name, value in user_columns.items():
+            if name and name.strip():
+                value_str = value.strip() if value else ""
+                if value_str:
+                    user_message_parts.append(f"- {name.strip()}: {value_str}")
+                else:
+                    user_message_parts.append(f"- {name.strip()}")
     
     if inputs:
         user_message_parts.append("\nZusätzliche Informationen:")

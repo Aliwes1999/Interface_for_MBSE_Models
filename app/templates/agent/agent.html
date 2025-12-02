@@ -19,9 +19,24 @@ endblock %} {% block content %}
   <div class="card">
     <div class="card-body">
       <form id="agent-form">
+        <!-- Maschine (zuerst) -->
+        <div class="mb-3">
+          <label for="machine" class="form-label">Maschine <span class="text-danger">*</span></label>
+          <input
+            type="text"
+            class="form-control"
+            id="machine"
+            name="machine"
+            placeholder="Gib die Maschine an, für die die Anforderungen erstellt werden sollen (z.B. CNC-Drehmaschine)"
+            required
+          />
+          <small class="form-text text-muted">Das Feld ist erforderlich.</small>
+        </div>
+
+        <!-- Beschreibung (zweiter) -->
         <div class="mb-3">
           <label for="user_description" class="form-label"
-            >User-Beschreibung (optional)</label
+            >Beschreibung (optional)</label
           >
           <textarea
             class="form-control"
@@ -37,6 +52,21 @@ endblock %} {% block content %}
           >
         </div>
 
+        <!-- Eigene Spalten (dritter) -->
+        <div class="mb-3">
+          <label class="form-label">Eigene Spalten (wird in Prompt eingebaut)</label>
+          <div id="columns-container">
+            <div class="input-group mb-2">
+              <input type="text" class="form-control" placeholder="Spaltenname" name="column_name[]">
+              <input type="text" class="form-control" placeholder="Beispielwert / Default" name="column_value[]">
+              <button type="button" class="btn btn-outline-danger remove-column">Entfernen</button>
+            </div>
+          </div>
+          <button type="button" class="btn btn-outline-primary" id="add-column">Spalte hinzufügen</button>
+          <small class="form-text text-muted mt-2">Definierte Spalten werden automatisch in den Prompt eingefügt und später in der Tabelle angezeigt.</small>
+        </div>
+
+        <!-- Zusätzliche Inputs (Key-Value-Paare) -->
         <div class="mb-3">
           <label class="form-label">Zusätzliche Inputs (Key-Value-Paare)</label>
           <div id="inputs-container">
@@ -93,94 +123,127 @@ endblock %} {% block content %}
   });
 
   // Remove key-value pair input
-  document
-    .getElementById("inputs-container")
-    .addEventListener("click", function (e) {
-      if (e.target.classList.contains("remove-input")) {
-        e.target.parentElement.remove();
+  document.getElementById("inputs-container").addEventListener("click", function (e) {
+    if (e.target.classList.contains("remove-input")) {
+      e.target.parentElement.remove();
+    }
+  });
+
+  // Add new custom column input
+  document.getElementById("add-column").addEventListener("click", function () {
+    const container = document.getElementById("columns-container");
+    const div = document.createElement("div");
+    div.className = "input-group mb-2";
+    div.innerHTML = `
+    <input type="text" class="form-control" placeholder="Spaltenname" name="column_name[]">
+    <input type="text" class="form-control" placeholder="Beispielwert / Default" name="column_value[]">
+    <button type="button" class="btn btn-outline-danger remove-column">Entfernen</button>
+  `;
+    container.appendChild(div);
+  });
+
+  // Remove custom column input
+  document.getElementById("columns-container").addEventListener("click", function (e) {
+    if (e.target.classList.contains("remove-column")) {
+      e.target.parentElement.remove();
+    }
+  });
+
+  // Handle form submission
+  document.getElementById("agent-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+
+    const btn = document.getElementById("generate-btn");
+    const spinner = btn.querySelector(".spinner-border");
+    const messageDiv = document.getElementById("response-message");
+
+    // Disable button and show spinner
+    btn.disabled = true;
+    spinner.classList.remove("d-none");
+    messageDiv.classList.add("d-none");
+
+    // Collect form data
+    const formData = new FormData(e.target);
+    const machine = formData.get("machine") || "";
+    const userDescription = formData.get("user_description") || "";
+
+    // Collect key-value pairs as array
+    const keys = formData.getAll("key[]");
+    const values = formData.getAll("value[]");
+    const inputs = [];
+
+    keys.forEach((key, i) => {
+      if (key && key.trim() && values[i] && values[i].trim()) {
+        inputs.push({
+          key: key.trim(),
+          value: values[i].trim(),
+        });
       }
     });
 
-  // Handle form submission
-  document
-    .getElementById("agent-form")
-    .addEventListener("submit", function (e) {
-      e.preventDefault();
+    // Collect custom columns
+    const colNames = formData.getAll("column_name[]");
+    const colValues = formData.getAll("column_value[]");
+    const columns = [];
 
-      const btn = document.getElementById("generate-btn");
-      const spinner = btn.querySelector(".spinner-border");
-      const messageDiv = document.getElementById("response-message");
+    colNames.forEach((name, i) => {
+      if (name && name.trim()) {
+        columns.push({
+          name: name.trim(),
+          value: (colValues[i] || "").trim(),
+        });
+      }
+    });
 
-      // Disable button and show spinner
-      btn.disabled = true;
-      spinner.classList.remove("d-none");
-      messageDiv.classList.add("d-none");
+    // Prepare request data
+    const data = {
+      machine: machine,
+      user_description: userDescription,
+      inputs: inputs,
+      columns: columns,
+    };
 
-      // Collect form data
-      const formData = new FormData(e.target);
-      const userDescription = formData.get("user_description") || "";
+    // Send POST request
+    fetch("/agent/generate/{{ project.id }}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "same-origin",
+      body: JSON.stringify(data),
+    })
+      .then((response) => response.json())
+      .then((result) => {
+        messageDiv.classList.remove("d-none");
 
-      // Collect key-value pairs as array
-      const keys = formData.getAll("key[]");
-      const values = formData.getAll("value[]");
-      const inputs = [];
-
-      keys.forEach((key, i) => {
-        if (key && key.trim() && values[i] && values[i].trim()) {
-          inputs.push({
-            key: key.trim(),
-            value: values[i].trim(),
-          });
-        }
-      });
-
-      // Prepare request data
-      const data = {
-        user_description: userDescription,
-        inputs: inputs,
-      };
-
-      // Send POST request
-      fetch("/agent/generate/{{ project.id }}", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "same-origin",
-        body: JSON.stringify(data),
-      })
-        .then((response) => response.json())
-        .then((result) => {
-          messageDiv.classList.remove("d-none");
-
-          if (result.ok) {
-            // Success
-            messageDiv.className = "alert alert-success mt-3";
-            messageDiv.innerHTML = `
+        if (result.ok) {
+          // Success
+          messageDiv.className = "alert alert-success mt-3";
+          messageDiv.innerHTML = `
         <strong>Erfolg!</strong> ${result.count} Requirement(s) wurden erfolgreich generiert und gespeichert.
         <br>Sie werden in Kürze zum Projekt weitergeleitet...
       `;
 
-            // Redirect after 2 seconds
-            setTimeout(function () {
-              window.location.href = result.redirect;
-            }, 2000);
-          } else {
-            // Error from backend
-            messageDiv.className = "alert alert-danger mt-3";
-            messageDiv.innerHTML = `<strong>Fehler:</strong> ${result.error}`;
-            btn.disabled = false;
-            spinner.classList.add("d-none");
-          }
-        })
-        .catch((error) => {
-          // Network or parsing error
-          messageDiv.classList.remove("d-none");
+          // Redirect after 2 seconds
+          setTimeout(function () {
+            window.location.href = result.redirect;
+          }, 2000);
+        } else {
+          // Error from backend
           messageDiv.className = "alert alert-danger mt-3";
-          messageDiv.innerHTML = `<strong>Netzwerkfehler:</strong> ${error.message}`;
+          messageDiv.innerHTML = `<strong>Fehler:</strong> ${result.error}`;
           btn.disabled = false;
           spinner.classList.add("d-none");
-        });
-    });
+        }
+      })
+      .catch((error) => {
+        // Network or parsing error
+        messageDiv.classList.remove("d-none");
+        messageDiv.className = "alert alert-danger mt-3";
+        messageDiv.innerHTML = `<strong>Netzwerkfehler:</strong> ${error.message}`;
+        btn.disabled = false;
+        spinner.classList.add("d-none");
+      });
+  });
 </script>
 {% endblock %}
