@@ -175,3 +175,4 @@ class RequirementVersion(db.Model):
             return self.requirement.project.is_accessible_by(user)
         # If blocked, only the blocker can unblock
         return self.blocked_by_id == user.id
+
