@@ -18,7 +18,7 @@ project_user_association = db.Table('project_user_association',
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(256), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
+    password_hash = db.Column(db.String(265), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     projects = db.relationship('Project', backref='user', lazy=True)
