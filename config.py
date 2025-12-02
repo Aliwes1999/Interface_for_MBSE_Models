@@ -6,6 +6,23 @@ OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
 SYSTEM_PROMPT_PATH = os.getenv('SYSTEM_PROMPT_PATH')
 SYSTEM_PROMPT = os.getenv('SYSTEM_PROMPT')
 
+class Config:
+    SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+class DevelopmentConfig(Config):
+    DEBUG = True
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'sqlite:///instance/db.db')
+
+class ProductionConfig(Config):
+    DEBUG = False
+    # Fix for Render's PostgreSQL URL format
+    # Render provides postgres:// but SQLAlchemy 1.4+ requires postgresql://
+    database_url = os.getenv('DATABASE_URL', 'sqlite:///instance/db.db')
+    if database_url and database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    SQLALCHEMY_DATABASE_URI = database_url
+
 # Default System Prompt if none provided
 DEFAULT_SYSTEM_PROMPT = """
 Du bist ein erfahrener Requirements Engineer.
