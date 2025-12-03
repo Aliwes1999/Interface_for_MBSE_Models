@@ -92,6 +92,16 @@ def generate_requirements(machine: str | None = None, user_description: str | No
         
         json_example = "{\n" + ",\n".join(json_fields) + "\n    }"
         
+        # Build hint for custom columns if they exist
+        custom_col_hint = ""
+        if user_columns:
+            custom_col_hint = "\n\nHinweise zu den benutzerdefinierten Spalten:\n"
+            for name, example_value in user_columns.items():
+                if example_value:
+                    custom_col_hint += f"- {name}: {example_value}\n"
+                else:
+                    custom_col_hint += f"- {name}: Fuelle mit einem sinnvollen Wert\n"
+        
         developer_message = f"""Du musst ausschließlich mit gültigem JSON antworten.
 Das JSON-Format muss exakt dieser Struktur folgen:
 {{
@@ -100,7 +110,8 @@ Das JSON-Format muss exakt dieser Struktur folgen:
   ]
 }}
 
-Wichtig: Fülle ALLE Spalten ({', '.join(columns)}) mit sinnvollen Werten.
+Wichtig: Fülle ALLE Spalten ({', '.join(columns)}) mit sinnvollen Werten.{custom_col_hint}
+
 Antworte NUR mit diesem JSON, ohne zusätzlichen Text davor oder danach."""
     else:
         # Fallback to default structure

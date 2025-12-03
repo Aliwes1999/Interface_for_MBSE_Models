@@ -121,9 +121,9 @@ def generate(project_id):
                 created_by_id=current_user.id  # Track who created this version
             )
             
-            # Save custom column data
+            # Save custom column data (all_custom_columns includes both old and new user-defined columns)
             custom_data = {}
-            for col in custom_columns:
+            for col in all_custom_columns:
                 value = item.get(col, "")
                 if value:
                     custom_data[col] = value
