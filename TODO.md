@@ -1,13 +1,17 @@
-# TODO: Deploy Flask App to Render.com with PostgreSQL
+- [ ] Remove default value for `SECRET_KEY` in `ProductionConfig` in `config.py`
 
-## Completed Tasks
+## 5. Frontend Modularization
 
-- [ ] Analyze project structure and configuration
-- [ ] Update config.py with Development and Production configs
-- [ ] Modify create_app() in app/**init**.py for environment-based config
-- [ ] Add flask-migrate to requirements.txt
-- [ ] Create wsgi.py
-- [ ] Create Procfile
-- [ ] Add Flask-Migrate setup in app/**init**.py
-- [ ] Run migrations (flask db init, migrate, upgrade)
-- [ ] Test locally and in production
+- [ ] Add CSRF tokens to all forms in `app/templates/create.html`
+- [ ] Extract modals (`shareProjectModal`, `importExcelModal`, `editRequirementModal`) into `app/templates/components/modals.html`
+- [ ] # Update `app/templates/create.html` to include the extracted modals
+
+## 4. Security Hardening
+
+- [x] Remove default value for `SECRET_KEY` in `ProductionConfig` in `config.py`
+
+## 5. Frontend Modularization
+
+- [x] Add CSRF tokens to all forms in `app/templates/create.html`
+- [x] Extract modals (`shareProjectModal`, `importExcelModal`, `editRequirementModal`) into `app/templates/components/modals.html`
+- [x] Update `app/templates/create.html` to include the extracted modals
