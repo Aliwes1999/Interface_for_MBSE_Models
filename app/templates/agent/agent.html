@@ -20,9 +20,19 @@ endblock %} {% block content %}
     <div class="card-body">
       <form id="agent-form">
         <div class="mb-3">
-          <label for="user_description" class="form-label"
-            >User-Beschreibung (optional)</label
-          >
+          <label for="maschine" class="form-label">Maschine</label>
+          <input
+            type="text"
+            class="form-control"
+            id="maschine"
+            name="maschine"
+            placeholder="Gib hier den Maschinennamen oder die Maschine ein (z. B. "Maschine A")."
+          />
+          <small class="form-text text-muted">Optional: Auf welche Maschine beziehen sich die Anforderungen?</small>
+        </div>
+
+        <div class="mb-3">
+          <label for="user_description" class="form-label">User-Beschreibung (optional)</label>
           <textarea
             class="form-control"
             id="user_description"
@@ -30,11 +40,7 @@ endblock %} {% block content %}
             rows="5"
             placeholder="Beschreibe die Requirements, die du generieren möchtest. Dieses Feld ist optional."
           ></textarea>
-          <small class="form-text text-muted"
-            >Gib eine allgemeine Beschreibung der gewünschten Requirements ein.
-            Wenn du keine Beschreibung angibst, werden allgemeine Requirements
-            generiert.</small
-          >
+          <small class="form-text text-muted">Gib eine allgemeine Beschreibung der gewünschten Requirements ein. Wenn du keine Beschreibung angibst, werden allgemeine Requirements generiert.</small>
         </div>
 
         <div class="mb-3">
@@ -116,11 +122,12 @@ endblock %} {% block content %}
       spinner.classList.remove("d-none");
       messageDiv.classList.add("d-none");
 
-      // Collect form data
-      const formData = new FormData(e.target);
-      const userDescription = formData.get("user_description") || "";
+  // Collect form data
+  const formData = new FormData(e.target);
+  const maschine = formData.get("maschine") || "";
+  const userDescription = formData.get("user_description") || "";
 
-      // Collect key-value pairs as array
+  // Collect key-value pairs as array
       const keys = formData.getAll("key[]");
       const values = formData.getAll("value[]");
       const inputs = [];
@@ -134,9 +141,20 @@ endblock %} {% block content %}
         }
       });
 
-      // Prepare request data
+      // Combine all user inputs into the prompt content that will be sent to the AI.
+      // The AI client expects a `user_description` string and an `inputs` dict.
+      // We include the Maschine and the Beschreibung in the user_description so
+      // that the prompt contains everything the user entered.
+      let combinedDescription = "";
+      if (maschine && maschine.trim()) {
+        combinedDescription += `Maschine: ${maschine.trim()}\n`;
+      }
+      if (userDescription && userDescription.trim()) {
+        combinedDescription += `Beschreibung: ${userDescription.trim()}\n`;
+      }
+
       const data = {
-        user_description: userDescription,
+        user_description: combinedDescription || null,
         inputs: inputs,
       };
 

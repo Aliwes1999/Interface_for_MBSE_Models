@@ -523,9 +523,10 @@ def export_excel(project_id):
         if not latest_version:
             continue
         
-        # Only export requirements with status "Fertig"
-        if latest_version.status != "Fertig":
-            continue
+        # Previously we filtered to only export requirements with status "Fertig".
+        # Remove this filter so that all non-deleted requirements are exported
+        # regardless of their status. If you want a filter, add a query
+        # parameter and apply it before iterating requirements.
         
         custom_data = latest_version.get_custom_data()
         
