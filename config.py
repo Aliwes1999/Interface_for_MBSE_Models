@@ -18,9 +18,10 @@ class DevelopmentConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
-    # Fix for Render's PostgreSQL URL format
-    # Render provides postgres:// but SQLAlchemy 1.4+ requires postgresql://
-    database_url = os.getenv('DATABASE_URL', 'sqlite:///instance/db.db')
+    SECRET_KEY = os.getenv('SECRET_KEY')  # No default value for security
+    # For local development, use local SQLite database
+    # For Render deployment, use PostgreSQL if DATABASE_URL is set
+    database_url = os.getenv('DATABASE_URL', 'sqlite:///db.db')
     if database_url and database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
     SQLALCHEMY_DATABASE_URI = database_url
