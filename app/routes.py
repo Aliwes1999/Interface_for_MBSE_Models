@@ -60,19 +60,40 @@ def project_overview(project_id):
 
     # Get all requirements with ALL versions (not just the latest)
     # Filter out deleted requirements
+    # If a specific file_id is provided, only show requirements from that file
     requirements = (
         Requirement.query
         .filter_by(project_id=project_id, is_deleted=False)
         .all()
     )
     
-    # For each requirement, get all versions
+    # For each requirement, get versions (filtered by source_file_id if provided)
     req_with_versions = []
+    generated_req_count = 0  # Count requirements from generated files (no upload source)
+    
     for req in requirements:
-        # Get all versions for this requirement
-        versions = req.versions
+        if focus_file_id:
+            # Only include versions from the specific file
+            versions = [v for v in req.versions if v.source_file_id == focus_file_id]
+        else:
+            # Show all versions
+            versions = req.versions
+        
         if versions:  # Only include requirements that have versions
             req_with_versions.append((req, versions))
+            
+            # Count requirements from generated files (source_file_id points to 'generated' type)
+            if not focus_file_id:
+                for v in versions:
+                    if v.source_file_id:
+                        source = ProjectFile.query.get(v.source_file_id)
+                        if source and source.file_type == 'generated':
+                            generated_req_count += 1
+                            break  # Count each requirement only once
+                    else:
+                        # Old requirements without source_file_id are also considered generated
+                        generated_req_count += 1
+                        break
     
     # Get custom columns for this project
     custom_columns = project.get_custom_columns()
@@ -82,6 +103,11 @@ def project_overview(project_id):
         ProjectFile.file_type.in_(['export', 'generated'])
     ).order_by(ProjectFile.created_at.desc()).first()
     
+    # Get the source file name if viewing specific file
+    source_file = None
+    if focus_file_id:
+        source_file = ProjectFile.query.get(focus_file_id)
+    
     return render_template(
         "create.html", 
         project=project, 
@@ -90,7 +116,9 @@ def project_overview(project_id):
         latest_snapshot=latest_snapshot,
         active_tab=active_tab,
         focus_file_id=focus_file_id,
-        show_archive=show_archive
+        show_archive=show_archive,
+        source_file=source_file,
+        generated_req_count=generated_req_count
     )
 
 @bp.route("/deleted_requirements")
@@ -181,6 +209,33 @@ def download_file(file_id):
         download_name=project_file.filename
     )
 
+@bp.route('/file/<int:file_id>/delete', methods=['POST'])
+@login_required
+def delete_project_file(file_id):
+    """Delete a project file and its associated requirements"""
+    project_file = ProjectFile.query.get_or_404(file_id)
+    project = project_file.project
+    
+    # Authorization check - only project owner can delete files
+    if project.user_id != current_user.id:
+        abort(403)
+    
+    # Delete physical file
+    if os.path.exists(project_file.filepath):
+        try:
+            os.remove(project_file.filepath)
+        except Exception as e:
+            print(f"Error deleting file {project_file.filepath}: {e}")
+    
+    # Delete all requirement versions associated with this file
+    RequirementVersion.query.filter_by(source_file_id=file_id).delete()
+    
+    # Delete the ProjectFile entry
+    db.session.delete(project_file)
+    db.session.commit()
+    
+    flash(f"Datei '{project_file.filename}' wurde gelöscht.", "success")
+    return redirect(url_for('main.project_overview', project_id=project.id, active_tab='files'))
 
 
 @bp.route("/project/delete/<int:project_id>", methods=['POST'])
@@ -364,8 +419,8 @@ def update_requirement_version(version_id):
     # Save changes
     db.session.commit()
     
-    flash(f"Requirement updated successfully. Status: {version.status}", "success")
-    return redirect(url_for('main.manage_project', project_id=version.requirement.project_id))
+    flash(f"Anforderung erfolgreich aktualisiert. Status: {version.status}", "success")
+    return redirect(request.referrer or url_for('main.manage_project', project_id=version.requirement.project_id))
 
 # Route to delete a specific version of a requirement
 @bp.route("/requirement_version/<int:version_id>/delete", methods=['POST'])
@@ -386,15 +441,15 @@ def delete_requirement_version(version_id):
     if remaining_versions == 1:
         # This is the last version, mark the requirement as deleted instead of deleting the version
         req.is_deleted = True
-        flash("Last version deleted. Requirement moved to trash.", "success")
+        flash("Letzte Version gelöscht. Anforderung in Papierkorb verschoben.", "success")
     else:
         # Delete this specific version
         db.session.delete(version)
-        flash(f"Version {version.version_label} deleted successfully.", "success")
+        flash(f"Version {version.version_label} erfolgreich gelöscht.", "success")
 
     db.session.commit()
 
-    return redirect(url_for('main.deleted_requirements_overview'))
+    return redirect(request.referrer or url_for('main.manage_project', project_id=project_id))
 
 # Route to soft delete a requirement (kept for compatibility, but marks all versions as deleted)
 @bp.route("/requirement/<int:req_id>/delete", methods=['POST'])
@@ -409,8 +464,8 @@ def delete_requirement(req_id):
     req.is_deleted = True
     db.session.commit()
 
-    flash("Requirement moved to trash.", "success")
-    return redirect(url_for('main.deleted_requirements_overview'))
+    flash("Anforderung in Papierkorb verschoben.", "success")
+    return redirect(request.referrer or url_for('main.manage_project', project_id=req.project_id))
 
 # Route to restore a deleted requirement
 @bp.route("/requirement/<int:req_id>/restore", methods=['POST'])
@@ -459,7 +514,7 @@ def regenerate_requirement(req_id):
     latest_version = req.get_latest_version()
     if not latest_version:
         flash("No existing version found to regenerate.", "danger")
-        return redirect(url_for('main.manage_project', project_id=req.project_id))
+        return redirect(request.referrer or url_for('main.manage_project', project_id=req.project_id))
     
     try:
         # Get project's custom columns
@@ -482,7 +537,7 @@ def regenerate_requirement(req_id):
         
         if not result:
             flash("Failed to generate alternative. AI returned empty result.", "danger")
-            return redirect(url_for('main.manage_project', project_id=req.project_id))
+            return redirect(request.referrer or url_for('main.manage_project', project_id=req.project_id))
         
         # Calculate next version
         next_index = latest_version.version_index + 1
@@ -497,7 +552,8 @@ def regenerate_requirement(req_id):
             description=result.get("description", latest_version.description),
             category=result.get("category", latest_version.category),
             status="Offen",  # New version starts as "Open"
-            created_by_id=current_user.id  # Track who created this version
+            created_by_id=current_user.id,  # Track who created this version
+            source_file_id=latest_version.source_file_id  # Keep same source file
         )
         
         # Get custom data from AI result or copy from previous version
@@ -514,36 +570,40 @@ def regenerate_requirement(req_id):
         db.session.add(new_version)
         db.session.commit()
         
-        flash(f"New version {next_label} generated successfully!", "success")
+        flash(f"Neue Version {next_label} erfolgreich generiert!", "success")
         
     except Exception as e:
-        flash(f"Error generating alternative: {str(e)}", "danger")
+        flash(f"Fehler beim Generieren: {str(e)}", "danger")
     
-    return redirect(url_for('main.manage_project', project_id=req.project_id))
+    return redirect(request.referrer or url_for('main.manage_project', project_id=req.project_id))
 
 def generate_single_requirement_alternative(context, columns):
     """Generate an alternative version of a requirement using AI."""
     try:
-        # Prepare prompt for AI
+        # Prepare prompt for AI - explicitly ask for a DIFFERENT alternative
         prompt = f"""
-        Generate an alternative version of the following requirement:
+        Erstelle eine ALTERNATIVE Version der folgenden Anforderung.
         
-        Project: {context['project_name']}
+        WICHTIG: Die neue Version muss INHALTLICH UNTERSCHIEDLICH sein, aber das gleiche Ziel verfolgen.
         
-        Original Requirement:
-        Title: {context['requirement_title']}
-        Description: {context['requirement_description']}
-        Category: {context['requirement_category']}
+        Projekt: {context['project_name']}
         
-        Additional Context:
+        Bisherige Version:
+        Titel: {context['requirement_title']}
+        Beschreibung: {context['requirement_description']}
+        Kategorie: {context['requirement_category']}
+        
+        Zusätzliche Daten:
         {context['custom_data']}
         
-        Please provide an improved version with:
-        1. A clearer title
-        2. A more detailed description
-        3. The same or improved category
+        Erstelle eine neue Version, die:
+        1. Einen anderen Ansatz oder eine andere Perspektive verfolgt
+        2. Andere technische Details oder Spezifikationen enthält
+        3. Eine alternative Formulierung oder Struktur hat
+        4. Das gleiche Ziel erreicht, aber auf andere Weise
         
-        Keep the core meaning but enhance clarity, completeness, and precision.
+        Die neue Version sollte sich deutlich von der bisherigen unterscheiden, aber das gleiche Problem lösen.
+        Sei kreativ und biete eine echte Alternative!
         """
         
         # Call the AI service
@@ -907,7 +967,7 @@ def toggle_block_requirement(version_id):
         flash(f"Version {version.version_label} wurde blockiert.", "warning")
     
     db.session.commit()
-    return redirect(url_for('main.manage_project', project_id=project.id))
+    return redirect(request.referrer or url_for('main.manage_project', project_id=project.id))
 
 @bp.route("/hello")
 def hello():

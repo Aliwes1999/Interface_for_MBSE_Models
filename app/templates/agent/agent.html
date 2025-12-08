@@ -49,6 +49,37 @@ endblock %} {% block content %}
         </div>
 
         <div class="mb-3">
+          <label class="form-label">Zusätzliche Spalten</label>
+          <div id="custom-columns-container">
+            <!-- Existing columns from project -->
+            {% for column in project.get_custom_columns() %}
+            <div class="input-group mb-2">
+              <input
+                type="text"
+                class="form-control"
+                value="{{ column }}"
+                readonly
+              />
+              <span class="input-group-text bg-secondary text-white"
+                >Bestehend</span
+              >
+            </div>
+            {% endfor %}
+          </div>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-primary"
+            id="add-column-btn"
+          >
+            <i class="bi bi-plus-circle"></i> Spalte hinzufügen
+          </button>
+          <small class="form-text text-muted d-block mt-2"
+            >Füge zusätzliche Spalten hinzu, die die KI ausfüllen soll (z.B.
+            "Priorität", "Kosten", "Verantwortlich").</small
+          >
+        </div>
+
+        <div class="mb-3">
           <label for="excel_file" class="form-label"
             >Bestehende Anforderungen hochladen (Excel)</label
           >
@@ -81,6 +112,25 @@ endblock %} {% block content %}
 </div>
 
 <script>
+  // Handle adding custom columns
+  let columnCounter = 0;
+  document
+    .getElementById("add-column-btn")
+    .addEventListener("click", function () {
+      columnCounter++;
+      const container = document.getElementById("custom-columns-container");
+      const newColumn = document.createElement("div");
+      newColumn.className = "input-group mb-2";
+      newColumn.id = `column-${columnCounter}`;
+      newColumn.innerHTML = `
+      <input type="text" class="form-control new-column" placeholder="Spaltenname eingeben..." />
+      <button class="btn btn-outline-danger" type="button" onclick="this.parentElement.remove()">
+        <i class="bi bi-trash"></i>
+      </button>
+    `;
+      container.appendChild(newColumn);
+    });
+
   // Handle form submission
   document
     .getElementById("agent-form")
@@ -102,6 +152,15 @@ endblock %} {% block content %}
       const userDescription = formData.get("user_description") || "";
       const fileInput = document.getElementById("excel_file");
 
+      // Collect new columns
+      const newColumns = [];
+      document.querySelectorAll(".new-column").forEach((input) => {
+        const value = input.value.trim();
+        if (value) {
+          newColumns.push(value);
+        }
+      });
+
       // Combine all user inputs into the prompt content that will be sent to the AI.
       // We include the Maschine and the Beschreibung in the user_description so
       // that the prompt contains everything the user entered.
@@ -120,6 +179,10 @@ endblock %} {% block content %}
       payload.append("user_description", combinedDescription);
       // Send empty inputs object to maintain backend compatibility
       payload.append("inputs", JSON.stringify([]));
+      // Send new columns to backend
+      if (newColumns.length > 0) {
+        payload.append("new_columns", JSON.stringify(newColumns));
+      }
 
       // Send POST request
       fetch("/agent/generate/{{ project.id }}", {

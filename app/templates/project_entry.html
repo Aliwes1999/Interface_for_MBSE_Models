@@ -49,9 +49,12 @@ endblock %} {% block content %}
     <div class="col-12">
       <a
         href="{{ url_for('main.project_overview', project_id=project.id) }}?active_tab=files#files"
-        class="btn btn-outline-secondary"
+        class="btn btn-outline-secondary me-2"
       >
         <i class="bi bi-folder"></i> Archiv
+      </a>
+      <a href="{{ url_for('main.home') }}" class="btn btn-outline-primary">
+        <i class="bi bi-house"></i> Zur Startseite
       </a>
     </div>
   </div>

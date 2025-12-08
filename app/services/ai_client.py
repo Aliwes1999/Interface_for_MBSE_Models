@@ -129,58 +129,41 @@ Gib 3-5 konkrete Verbesserungsvorschläge als Liste zurück."""
         except Exception as e:
             return [f"Verbesserungsvorschläge konnten nicht generiert werden: {str(e)}"]
 
-def generate_requirements(user_description: str | None, inputs: dict, columns: list = None, existing_requirements: list[dict] = None) -> list[dict]:
+def generate_new_requirements(user_description: str | None, inputs: dict, columns: list = None) -> list[dict]:
     """
-    Calls OpenAI API to generate requirements based on user description and inputs.
+    Generate COMPLETELY NEW requirements from scratch using AI.
+    Used for: "Neue Anforderungen generieren" button
 
     Args:
         user_description (str | None): Optional user description of requirements.
         inputs (dict): Key-value pairs for additional context.
         columns (list): Optional list of column names for the project.
-        existing_requirements (list[dict]): Optional list of existing requirements to optimize.
 
     Returns:
         list[dict]: List of requirement dicts with dynamic columns based on project.
-
-    Raises:
-        ValueError: If OPENAI_API_KEY is not set.
-        RuntimeError: If OpenAI API call fails or response is invalid.
     """
-    # Get configuration
     api_key = config.OPENAI_API_KEY
     model = config.OPENAI_MODEL or "gpt-4o-mini"
 
-    # New structured system prompt based on 4-phase methodology
-    if existing_requirements:
-        system_prompt = """Du bist ein erfahrener Requirements Engineer. Arbeite nach dem 4-Phasen-Modell:
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY environment variable must be set.")
 
-PHASE 1 & 2 (Analyse/Struktur): Analysiere die übergebenen bestehenden Anforderungen. Verstehe den Kontext und die Struktur.
+    # System prompt for NEW generation
+    system_prompt = """Du bist ein erfahrener Requirements Engineer. Arbeite nach dem 4-Phasen-Modell:
 
-PHASE 3 (Erstellung): Verbessere jede einzelne Anforderung inhaltlich (SMART, Normen, Präzision). Behalte die Struktur bei, aber optimiere den Inhalt.
+PHASE 1 & 2 (Analyse/Struktur): Verstehe den Kontext und strukturiere die Anforderungen logisch.
 
-PHASE 4 (Review): Führe einen Qualitätscheck durch - jede Anforderung muss präzise, messbar und normenkonform sein.
-
-WICHTIG: Antworte nur mit den verbesserten Anforderungen im geforderten JSON-Format. Kein zusätzlicher Text."""
-    else:
-        system_prompt = """Du bist ein erfahrener Requirements Engineer. Arbeite nach dem 4-Phasen-Modell:
-
-PHASE 1 & 2 (Analyse/Struktur): Verstehe den Kontext und strukturiere die Anforderungen.
-
-PHASE 3 (Erstellung): Formuliere Anforderungen nach der Satzschablone "Das System muss...". Stelle sicher, dass sie SMART, normenkonform und präzise sind.
+PHASE 3 (Erstellung): Formuliere NEUE Anforderungen nach der Satzschablone "Das System muss...". 
+Stelle sicher, dass sie SMART, normenkonform und präzise sind.
 
 PHASE 4 (Review): Qualitätscheck - jede Anforderung muss messbar, akzeptabel und testbar sein.
 
 WICHTIG: Antworte nur mit den generierten Anforderungen im geforderten JSON-Format. Kein zusätzlicher Text."""
 
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY environment variable must be set.")
-
-    # Initialize OpenAI client
     client = OpenAI(api_key=api_key)
 
-    # Build user message from user_description and inputs
+    # Build user message
     user_message_parts = []
-    
     if user_description and user_description.strip():
         user_message_parts.append(f"Beschreibung: {user_description.strip()}")
     
@@ -190,28 +173,11 @@ WICHTIG: Antworte nur mit den generierten Anforderungen im geforderten JSON-Form
             if key and value:
                 user_message_parts.append(f"- {key}: {value}")
     
-    if not user_message_parts:
-        user_message = "Bitte generiere allgemeine Software-Anforderungen."
-    else:
-        user_message = "\n".join(user_message_parts)
+    user_message = "\n".join(user_message_parts) if user_message_parts else "Bitte generiere allgemeine Software-Anforderungen."
 
-    # Build developer message with dynamic JSON schema
+    # Build developer message
     if columns and isinstance(columns, list):
-        # Build JSON structure based on columns
-        json_fields = []
-        for col in columns:
-            col_lower = col.lower()
-            if col_lower in ['titel', 'title']:
-                json_fields.append(f'      "{col}": "Kurzer, prägnanter Titel"')
-            elif col_lower in ['beschreibung', 'description']:
-                json_fields.append(f'      "{col}": "Detaillierte Beschreibung mit Akzeptanzkriterien"')
-            elif col_lower in ['kategorie', 'category']:
-                json_fields.append(f'      "{col}": "Kategorie (z.B. Funktional, Nicht-Funktional, etc.)"')
-            elif col_lower in ['status']:
-                json_fields.append(f'      "{col}": "Offen"')
-            else:
-                json_fields.append(f'      "{col}": "Passender Wert für {col}"')
-        
+        json_fields = [f'      "{col}": "Passender Wert für {col}"' for col in columns]
         json_example = "{\n" + ",\n".join(json_fields) + "\n    }"
         
         developer_message = f"""Du musst ausschließlich mit gültigem JSON antworten.
@@ -222,10 +188,13 @@ Das JSON-Format muss exakt dieser Struktur folgen:
   ]
 }}
 
-Wichtig: Fülle ALLE Spalten ({', '.join(columns)}) mit sinnvollen Werten.
-Antworte NUR mit diesem JSON, ohne zusätzlichen Text davor oder danach."""
+WICHTIG: 
+- Verwende EXAKT diese Spaltennamen: {', '.join(columns)}
+- Fülle ALLE Spalten mit sinnvollen Werten
+- Behalte die Struktur und Spaltennamen EXAKT bei
+- Generiere MINDESTENS 5 verschiedene Anforderungen
+- Antworte NUR mit diesem JSON, ohne zusätzlichen Text davor oder danach."""
     else:
-        # Fallback to default structure
         developer_message = """Du musst ausschließlich mit gültigem JSON antworten.
 Das JSON-Format muss exakt dieser Struktur folgen:
 {
@@ -239,10 +208,11 @@ Das JSON-Format muss exakt dieser Struktur folgen:
   ]
 }
 
-Antworte NUR mit diesem JSON, ohne zusätzlichen Text davor oder danach."""
+WICHTIG:
+- Generiere MINDESTENS 5 verschiedene Anforderungen
+- Antworte NUR mit diesem JSON, ohne zusätzlichen Text davor oder danach."""
 
     try:
-        # Call OpenAI Chat Completions API
         response = client.chat.completions.create(
             model=model,
             messages=[
@@ -251,19 +221,135 @@ Antworte NUR mit diesem JSON, ohne zusätzlichen Text davor oder danach."""
                 {"role": "user", "content": user_message}
             ],
             temperature=0.2,
-            max_tokens=1200
+            max_tokens=2000
         )
 
-        # Extract response content
         response_text = response.choices[0].message.content.strip()
-
-        # Parse JSON response
         requirements = _parse_json_response(response_text, columns)
-        
         return requirements
 
     except Exception as e:
         raise RuntimeError(f"OpenAI request failed: {str(e)}")
+
+
+def optimize_excel_requirements(existing_requirements: list[dict], columns: list, user_description: str | None = None) -> list[dict]:
+    """
+    Optimize and improve EXISTING requirements from Excel file using AI.
+    Used for: Excel file upload with AI optimization
+
+    Args:
+        existing_requirements (list[dict]): Existing requirements from Excel
+        columns (list): Column names from the Excel file
+        user_description (str | None): Optional additional context
+
+    Returns:
+        list[dict]: Optimized requirements maintaining Excel structure
+    """
+    api_key = config.OPENAI_API_KEY
+    model = config.OPENAI_MODEL or "gpt-4o-mini"
+
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY environment variable must be set.")
+
+    # System prompt for OPTIMIZATION
+    system_prompt = """Du bist ein erfahrener Requirements Engineer. Arbeite nach dem 4-Phasen-Modell:
+
+PHASE 1 & 2 (Analyse/Struktur): Analysiere die übergebenen bestehenden Anforderungen aus der Excel-Datei. 
+Verstehe den Kontext und die vorhandene Struktur.
+
+PHASE 3 (Optimierung): Verbessere jede einzelne Anforderung inhaltlich:
+- Präzisiere die Formulierung
+- Stelle SMART-Kriterien sicher
+- Verbessere Normenkonformität
+- BEHALTE die Anzahl der Anforderungen GLEICH (keine neuen hinzufügen!)
+- BEHALTE die Spaltenstruktur EXAKT bei
+
+PHASE 4 (Review): Qualitätscheck - jede Anforderung muss präzise, messbar und normenkonform sein.
+
+WICHTIG: Antworte nur mit den OPTIMIERTEN Anforderungen im gleichen JSON-Format. Kein zusätzlicher Text."""
+
+    client = OpenAI(api_key=api_key)
+
+    # Build user message
+    user_message_parts = []
+    user_message_parts.append("Bestehende Anforderungen aus Excel-Datei (bitte optimieren und verbessern):")
+    user_message_parts.append(json.dumps(existing_requirements, ensure_ascii=False, indent=2))
+    
+    if user_description and user_description.strip():
+        user_message_parts.append(f"\nZusätzliche Hinweise zur Optimierung: {user_description.strip()}")
+    
+    user_message = "\n".join(user_message_parts)
+
+    # Build developer message
+    json_fields = [f'      "{col}": "Optimierter Wert für {col}"' for col in columns]
+    json_example = "{\n" + ",\n".join(json_fields) + "\n    }"
+    
+    developer_message = f"""Du musst ausschließlich mit gültigem JSON antworten.
+Das JSON-Format muss exakt dieser Struktur folgen:
+{{
+  "requirements": [
+    {json_example}
+  ]
+}}
+
+KRITISCH WICHTIG: 
+- Verwende EXAKT diese Spaltennamen: {', '.join(columns)}
+- KEINE zusätzlichen Spalten hinzufügen
+- KEINE Spalten entfernen
+- Behalte die GLEICHE ANZAHL an Anforderungen wie im Input
+- Optimiere nur den INHALT, nicht die Struktur
+- Antworte NUR mit diesem JSON, ohne zusätzlichen Text davor oder danach."""
+
+    try:
+        print(f"DEBUG optimize_excel_requirements: columns={columns}")
+        print(f"DEBUG optimize_excel_requirements: input count={len(existing_requirements)}")
+        if existing_requirements:
+            print(f"DEBUG optimize_excel_requirements: first item sample={existing_requirements[0]}")
+        
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "developer", "content": developer_message},
+                {"role": "user", "content": user_message}
+            ],
+            temperature=0.2,
+            max_tokens=3000  # Increased for larger Excel files
+        )
+
+        response_text = response.choices[0].message.content.strip()
+        print(f"DEBUG optimize_excel_requirements: AI response length={len(response_text)}")
+        print(f"DEBUG optimize_excel_requirements: AI response preview={response_text[:200] if len(response_text) > 200 else response_text}")
+        
+        requirements = _parse_json_response(response_text, columns)
+        print(f"DEBUG optimize_excel_requirements: output count={len(requirements)}")
+        return requirements
+
+    except Exception as e:
+        print(f"ERROR in optimize_excel_requirements: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise RuntimeError(f"OpenAI request failed: {str(e)}")
+
+
+def generate_requirements(user_description: str | None, inputs: dict, columns: list = None, existing_requirements: list[dict] = None) -> list[dict]:
+    """
+    DEPRECATED: Use generate_new_requirements() or optimize_excel_requirements() instead.
+    This function is kept for backwards compatibility.
+    
+    Args:
+        user_description (str | None): Optional user description of requirements.
+        inputs (dict): Key-value pairs for additional context.
+        columns (list): Optional list of column names for the project.
+        existing_requirements (list[dict]): Optional list of existing requirements to optimize.
+
+    Returns:
+        list[dict]: List of requirement dicts with dynamic columns based on project.
+    """
+    if existing_requirements:
+        return optimize_excel_requirements(existing_requirements, columns, user_description)
+    else:
+        return generate_new_requirements(user_description, inputs, columns)
 
 
 def _parse_json_response(response_text: str, columns: list = None) -> list[dict]:
@@ -384,5 +470,4 @@ def _validate_and_normalize_requirements(requirements: list, columns: list = Non
     if not normalized:
         raise RuntimeError("No valid requirements found in response.")
     
-    # Limit to maximum 10 requirements
-    return normalized[:10]
+    return normalized

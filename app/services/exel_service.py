@@ -42,13 +42,13 @@ def parse_excel_to_data(file_path: str, sheet_name: Optional[str] = None) -> Lis
         else:
             ws = wb.active
         
-        # Read header row
+        # Read header row - only include non-empty headers
         headers = []
-        for cell in ws[1]:
-            if cell.value:
+        header_indices = []  # Track which column indices have valid headers
+        for idx, cell in enumerate(ws[1]):
+            if cell.value and str(cell.value).strip():
                 headers.append(str(cell.value).strip())
-            else:
-                headers.append(f"Column_{len(headers) + 1}")
+                header_indices.append(idx)
         
         if not headers:
             raise ValueError("Excel file has no headers in the first row")
@@ -57,18 +57,23 @@ def parse_excel_to_data(file_path: str, sheet_name: Optional[str] = None) -> Lis
         data = []
         for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
             if not row or all(cell is None or str(cell).strip() == '' for cell in row):
-                continue  # Skip empty rows
+                continue  # Skip completely empty rows
             
             row_dict = {}
-            for col_idx, (header, value) in enumerate(zip(headers, row)):
-                # Convert value to string and strip whitespace
-                if value is not None:
-                    row_dict[header] = str(value).strip()
+            # Only process columns that have headers
+            for header, col_idx in zip(headers, header_indices):
+                if col_idx < len(row):
+                    value = row[col_idx]
+                    # Convert value to string and strip whitespace
+                    if value is not None and str(value).strip():
+                        row_dict[header] = str(value).strip()
+                    else:
+                        row_dict[header] = ""
                 else:
                     row_dict[header] = ""
             
-            # Only add row if it has at least one non-empty value
-            if any(v for v in row_dict.values()):
+            # Only add row if it has at least one non-empty value (excluding system columns)
+            if any(v for k, v in row_dict.items() if v and k.lower() not in ['version', 'id']):
                 data.append(row_dict)
         
         return data
