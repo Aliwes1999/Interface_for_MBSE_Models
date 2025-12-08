@@ -1,8 +1,10 @@
 import os
 from app import create_app
 
-# Set production environment for Render
-os.environ.setdefault('FLASK_ENV', 'production')
+# Only set production environment if not already set (for Render deployment)
+# This allows local development to use FLASK_ENV from .flaskenv
+if 'RENDER' in os.environ:
+    os.environ.setdefault('FLASK_ENV', 'production')
 
 # Create the Flask application
 app = create_app()

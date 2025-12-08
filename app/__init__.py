@@ -49,9 +49,3 @@ def create_app():
 def load_user(user_id):
     from .models import User
     return User.query.get(int(user_id))
-
-# Set production environment for Render
-os.environ.setdefault('FLASK_ENV', 'production')
-
-# Create app instance for gunicorn
-app = create_app()
