@@ -1,13 +1,11 @@
 // Global flag to ensure event delegation is only set up once
 let eventListenersAttached = false;
 
-// Global function to attach event listeners - can be called multiple times
+// Global function to attach event listeners
 function attachEventListeners() {
-  console.log("Attaching event listeners...");
-
   // Only attach delegated event listeners once
   if (!eventListenersAttached) {
-    // Version selector change event - use event delegation
+    // Version selector change event
     document.addEventListener("change", function (e) {
       if (e.target.classList.contains("version-selector")) {
         const reqId = e.target.getAttribute("data-req-id");
@@ -16,7 +14,7 @@ function attachEventListeners() {
       }
     });
 
-    // Edit requirement button click - use event delegation
+    // Edit requirement button click
     document.addEventListener("click", function (e) {
       if (
         e.target.classList.contains("edit-requirement-btn") ||
@@ -79,19 +77,15 @@ function attachEventListeners() {
     });
     filterText.dataset.listenerAttached = "true";
   }
-
-  console.log("Event listeners attached");
 }
 
-// Global function to update custom columns
+// Update custom columns
 function updateCustomColumns(newColumns) {
-  console.log("Updating custom columns:", newColumns);
   window.PROJECT_CUSTOM_COLUMNS = newColumns;
-  // Reinitialize filters with new columns
   initializeFilters();
 }
 
-// Functions
+// Update row with version data
 function updateRowWithVersionData(reqId, versionIndex) {
   const row = document.getElementById(`req-row-${reqId}`);
   const versionsData = document.getElementById(`versions-data-${reqId}`);
@@ -115,7 +109,6 @@ function updateRowWithVersionData(reqId, versionIndex) {
         customData = JSON.parse(customDataStr);
       }
     } catch (e) {
-      console.error("Error parsing custom data:", e);
       customData = {};
     }
 
@@ -131,13 +124,6 @@ function updateRowWithVersionData(reqId, versionIndex) {
     const statusColor = selectedVersion.getAttribute("data-status-color");
     statusCell.innerHTML = `<span class="badge" style="background-color: ${statusColor}">${status}</span>`;
 
-    // Update user cell if exists
-    const userCell = row.querySelector(".user-cell");
-    if (userCell) {
-      // Keep the user cell as is, or you could update it based on version creator
-      // For now, we'll leave it unchanged as it shows the creator
-    }
-
     const editButton = row.querySelector(".edit-requirement-btn");
     if (editButton) {
       editButton.setAttribute("data-version-id", versionId);
@@ -150,9 +136,8 @@ function updateRowWithVersionData(reqId, versionIndex) {
   }
 }
 
+// Initialize filters
 function initializeFilters() {
-  console.log("Initializing filters...");
-
   // Populate category filter
   const categories = new Set();
   document.querySelectorAll(".category-cell").forEach((cell) => {
@@ -164,7 +149,6 @@ function initializeFilters() {
 
   const categoryFilter = document.getElementById("filterCategory");
   if (categoryFilter) {
-    // Clear existing options except the first "Alle" option
     while (categoryFilter.options.length > 1) {
       categoryFilter.remove(1);
     }
@@ -179,12 +163,9 @@ function initializeFilters() {
 
   // Create dynamic column filters
   const customColumns = window.PROJECT_CUSTOM_COLUMNS || [];
-  const dynamicFiltersContainer = document.getElementById(
-    "dynamicFiltersContainer"
-  );
+  const dynamicFiltersContainer = document.getElementById("dynamicFiltersContainer");
 
   if (dynamicFiltersContainer) {
-    // Clear existing dynamic filters
     dynamicFiltersContainer.innerHTML = "";
 
     customColumns.forEach((column) => {
@@ -228,13 +209,10 @@ function initializeFilters() {
       }
     });
   }
-
-  console.log("Filters initialized");
 }
 
+// Apply filters
 function applyFilters() {
-  console.log("Applying filters...");
-
   const textFilter = document.getElementById("filterText").value.toLowerCase();
   const statusFilter = document.getElementById("filterStatus").value;
   const categoryFilter = document.getElementById("filterCategory").value;
@@ -257,9 +235,7 @@ function applyFilters() {
 
     if (textFilter) {
       const title = row.querySelector(".title-cell").textContent.toLowerCase();
-      const description = row
-        .querySelector(".description-cell")
-        .textContent.toLowerCase();
+      const description = row.querySelector(".description-cell").textContent.toLowerCase();
       if (!title.includes(textFilter) && !description.includes(textFilter)) {
         visible = false;
       }
@@ -281,9 +257,7 @@ function applyFilters() {
 
     if (visible && Object.keys(dynamicFilters).length > 0) {
       for (const [column, value] of Object.entries(dynamicFilters)) {
-        const cell = row.querySelector(
-          `.custom-data-cell[data-column="${column}"]`
-        );
+        const cell = row.querySelector(`.custom-data-cell[data-column="${column}"]`);
         if (cell) {
           const cellValue = cell.textContent.trim();
           if (cellValue !== value) {
@@ -294,12 +268,8 @@ function applyFilters() {
       }
     }
 
-    if (visible) {
-      row.style.display = "";
-      visibleCount++;
-    } else {
-      row.style.display = "none";
-    }
+    row.style.display = visible ? "" : "none";
+    if (visible) visibleCount++;
   });
 
   const resultText = `${visibleCount} von ${totalCount} angezeigt`;
@@ -307,13 +277,10 @@ function applyFilters() {
   if (resultCount) {
     resultCount.textContent = resultText;
   }
-
-  console.log(`Filter applied: ${visibleCount}/${totalCount} visible`);
 }
 
+// Open edit modal
 function openEditModal(reqId, versionId) {
-  console.log("Opening edit modal for req:", reqId, "version:", versionId);
-
   document.getElementById("editVersionId").value = versionId;
 
   const versionsData = document.getElementById(`versions-data-${reqId}`);
@@ -327,42 +294,24 @@ function openEditModal(reqId, versionId) {
   });
 
   if (selectedVersion) {
-    document.getElementById("editTitle").value =
-      selectedVersion.getAttribute("data-title");
-    document.getElementById("editDescription").value =
-      selectedVersion.getAttribute("data-description");
-    document.getElementById("editCategory").value =
-      selectedVersion.getAttribute("data-category");
+    document.getElementById("editTitle").value = selectedVersion.getAttribute("data-title");
+    document.getElementById("editDescription").value = selectedVersion.getAttribute("data-description");
+    document.getElementById("editCategory").value = selectedVersion.getAttribute("data-category");
 
     let customData = {};
     try {
       const customDataStr = selectedVersion.getAttribute("data-custom-data");
-      console.log("Raw custom data string:", customDataStr);
-
-      if (
-        customDataStr &&
-        customDataStr.trim() !== "" &&
-        customDataStr !== "null"
-      ) {
+      if (customDataStr && customDataStr.trim() !== "" && customDataStr !== "null") {
         customData = JSON.parse(customDataStr);
-        console.log("Parsed custom data:", customData);
       }
     } catch (e) {
-      console.error("Error parsing custom data in edit modal:", e);
-      console.error(
-        "Problematic string was:",
-        selectedVersion.getAttribute("data-custom-data")
-      );
       customData = {};
     }
 
     const dynamicContainer = document.getElementById("dynamicColumnsContainer");
     dynamicContainer.innerHTML = "";
 
-    // USE GLOBAL VARIABLE INSTEAD OF JINJA2
     const customColumns = window.PROJECT_CUSTOM_COLUMNS || [];
-    console.log("Custom columns for edit:", customColumns);
-    console.log("Custom data object:", customData);
 
     customColumns.forEach((column) => {
       const fieldDiv = document.createElement("div");
@@ -383,21 +332,13 @@ function openEditModal(reqId, versionId) {
       dynamicContainer.appendChild(fieldDiv);
     });
 
-    const modal = new bootstrap.Modal(
-      document.getElementById("editRequirementModal")
-    );
+    const modal = new bootstrap.Modal(document.getElementById("editRequirementModal"));
     modal.show();
   }
 }
 
 // Initialize on DOMContentLoaded
 document.addEventListener("DOMContentLoaded", function () {
-  console.log("Project.js loaded");
-  console.log("Custom columns:", window.PROJECT_CUSTOM_COLUMNS);
-
-  // Attach event listeners
   attachEventListeners();
-
-  // Initialize filters
   initializeFilters();
 });

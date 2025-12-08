@@ -224,8 +224,8 @@ def delete_project_file(file_id):
     if os.path.exists(project_file.filepath):
         try:
             os.remove(project_file.filepath)
-        except Exception as e:
-            print(f"Error deleting file {project_file.filepath}: {e}")
+        except Exception:
+            pass  # Silently ignore file deletion errors
     
     # Delete all requirement versions associated with this file
     RequirementVersion.query.filter_by(source_file_id=file_id).delete()
@@ -615,8 +615,7 @@ def generate_single_requirement_alternative(context, columns):
         
         return None
         
-    except Exception as e:
-        print(f"Error in generate_single_requirement_alternative: {str(e)}")
+    except Exception:
         raise
 
 # Route to export project requirements to Excel

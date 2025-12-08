@@ -144,11 +144,6 @@ def upload_excel_route(project_id):
             # Get optional user description from form
             user_description = request.form.get('user_description', '').strip()
 
-            # Debug: Print Excel data
-            print(f"DEBUG: Excel columns: {filtered_columns}")
-            print(f"DEBUG: Excel data count: {len(cleaned_excel_data)}")
-            print(f"DEBUG: First row sample: {cleaned_excel_data[0] if cleaned_excel_data else 'None'}")
-
             # Optimize requirements using AI while maintaining structure
             try:
                 optimized_reqs = optimize_excel_requirements(
@@ -157,9 +152,6 @@ def upload_excel_route(project_id):
                     user_description=user_description if user_description else None
                 )
             except Exception as e:
-                print(f"ERROR in optimize_excel_requirements: {str(e)}")
-                import traceback
-                traceback.print_exc()
                 return jsonify({
                     'ok': False,
                     'error': f'KI-Optimierung fehlgeschlagen: {str(e)}'
@@ -335,9 +327,8 @@ def generate_requirements_route(project_id):
                 if len(merged_columns) > len(existing_columns):
                     project.set_custom_columns(merged_columns)
                     db.session.commit()
-                    print(f"Added new columns to project: {new_columns}")
         except Exception as e:
-            print(f"Error parsing new columns: {e}")
+            pass  # Silently ignore column parsing errors
         
         # This endpoint is ONLY for AI generation (no Excel upload)
         # For Excel upload, use /upload_excel endpoint instead
@@ -415,8 +406,7 @@ def generate_requirements_route(project_id):
             # Get the file ID for linking requirements
             generated_file_id = project_file.id
         except Exception as e:
-            # non-fatal: ignore snapshot errors but log
-            print(f"Error creating snapshot: {e}")
+            # Non-fatal: silently ignore snapshot errors
             generated_file_id = None
         
         # Now save generated requirements to database with correct source_file_id
