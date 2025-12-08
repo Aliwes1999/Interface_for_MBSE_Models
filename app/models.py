@@ -109,6 +109,9 @@ class RequirementVersion(db.Model):
     # JSON field to store dynamic column values
     custom_data = db.Column(db.Text, default='{}')  # Stores {column_name: value} as JSON
     
+    # Link to source file (for tracking which upload/generation created this version)
+    source_file_id = db.Column(db.Integer, db.ForeignKey('project_file.id'), nullable=True)
+    
     # User tracking fields
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     last_modified_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
@@ -122,6 +125,7 @@ class RequirementVersion(db.Model):
     created_by = db.relationship('User', foreign_keys=[created_by_id], backref='created_versions')
     last_modified_by = db.relationship('User', foreign_keys=[last_modified_by_id], backref='modified_versions')
     blocked_by = db.relationship('User', foreign_keys=[blocked_by_id], backref='blocked_versions')
+    source_file = db.relationship('ProjectFile', foreign_keys=[source_file_id], backref='generated_versions')
 
     __table_args__ = (
         db.UniqueConstraint('requirement_id', 'version_index', name='uq_req_version'),
@@ -153,13 +157,13 @@ class RequirementVersion(db.Model):
         self.custom_data = json.dumps(data)
     
     def get_status_color(self):
-        """Get Bootstrap color class for status."""
+        """Get color code for status badge."""
         status_colors = {
-            'Offen': 'danger',      # Red
-            'In Arbeit': 'warning', # Yellow
-            'Fertig': 'success'     # Green
+            'Offen': '#dc3545',        # Red (Bootstrap danger)
+            'In Arbeit': '#ffc107',    # Yellow (Bootstrap warning)
+            'Fertig': '#28a745'        # Green (Bootstrap success)
         }
-        return status_colors.get(self.status, 'secondary')
+        return status_colors.get(self.status, '#6c757d')  # Default gray
     
     def can_be_edited_by(self, user):
         """Check if user can edit this version (not blocked or blocked by this user or project owner)."""

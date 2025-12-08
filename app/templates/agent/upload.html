@@ -23,7 +23,7 @@ project.name }}{% endblock %} {% block content %}
       <form
         id="upload-form"
         method="POST"
-        action="{{ url_for('agent.generate_requirements_route', project_id=project.id) }}"
+        action="{{ url_for('agent.upload_excel_route', project_id=project.id) }}"
         enctype="multipart/form-data"
       >
         <div class="mb-3">

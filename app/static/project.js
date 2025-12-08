@@ -106,18 +106,8 @@ function updateRowWithVersionData(reqId, versionIndex) {
 
   if (selectedVersion) {
     const versionId = selectedVersion.getAttribute("data-version-id");
-    row.querySelector(".title-cell").textContent =
-      selectedVersion.getAttribute("data-title");
-    row.querySelector(".description-cell").textContent =
-      selectedVersion.getAttribute("data-description");
-    row.querySelector(".category-cell").textContent =
-      selectedVersion.getAttribute("data-category") || "–";
 
-    const statusCell = row.querySelector(".status-cell");
-    const status = selectedVersion.getAttribute("data-status");
-    const statusColor = selectedVersion.getAttribute("data-status-color");
-    statusCell.innerHTML = `<span class="badge bg-${statusColor}">${status}</span>`;
-
+    // Update custom data cells
     let customData = {};
     try {
       const customDataStr = selectedVersion.getAttribute("data-custom-data");
@@ -128,14 +118,30 @@ function updateRowWithVersionData(reqId, versionIndex) {
       console.error("Error parsing custom data:", e);
       customData = {};
     }
+
     const customDataCells = row.querySelectorAll(".custom-data-cell");
     customDataCells.forEach((cell) => {
       const column = cell.getAttribute("data-column");
       cell.textContent = customData[column] || "–";
     });
 
+    // Update status cell with hex color
+    const statusCell = row.querySelector(".status-cell");
+    const status = selectedVersion.getAttribute("data-status");
+    const statusColor = selectedVersion.getAttribute("data-status-color");
+    statusCell.innerHTML = `<span class="badge" style="background-color: ${statusColor}">${status}</span>`;
+
+    // Update user cell if exists
+    const userCell = row.querySelector(".user-cell");
+    if (userCell) {
+      // Keep the user cell as is, or you could update it based on version creator
+      // For now, we'll leave it unchanged as it shows the creator
+    }
+
     const editButton = row.querySelector(".edit-requirement-btn");
-    editButton.setAttribute("data-version-id", versionId);
+    if (editButton) {
+      editButton.setAttribute("data-version-id", versionId);
+    }
 
     const deleteForm = row.querySelector(".delete-version-form");
     if (deleteForm) {
