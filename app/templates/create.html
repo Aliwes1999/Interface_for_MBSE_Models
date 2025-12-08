@@ -27,17 +27,17 @@ content %} {% if not project %}
 {% else %}
 <!-- Project View -->
 <div class="mb-3">
+  <a
+    href="{{ url_for('main.manage_project', project_id=project.id) }}"
+    class="btn btn-secondary"
+  >
+    <i class="bi bi-arrow-left"></i> Zurück zum Projekt-Einstieg
+  </a>
   <a href="{{ url_for('main.home') }}" class="btn btn-secondary">
     <i class="bi bi-house"></i> Zurück zur Startseite
   </a>
-  <a
-    href="{{ url_for('agent.agent_page', project_id=project.id) }}"
-    class="btn btn-primary"
-  >
-    <i class="bi bi-robot"></i> KI-Agent öffnen
-  </a>
   <button
-    class="btn btn-warning"
+    class="btn btn-warning ms-2"
     type="button"
     data-bs-toggle="modal"
     data-bs-target="#shareProjectModal"
@@ -45,7 +45,6 @@ content %} {% if not project %}
     <i class="bi bi-share"></i> Projekt teilen
   </button>
 </div>
-
 <!-- Shared Users Display -->
 {% if project.shared_with %}
 <div class="alert alert-info mb-3">
@@ -71,338 +70,507 @@ content %} {% if not project %}
 </div>
 {% endif %}
 
-<h2 class="mt-4 mb-4">Anforderungen für Projekt: {{ project.name }}</h2>
+<h2 class="mt-4 mb-4">Projekt: {{ project.name }}</h2>
 
-<!-- Pass custom columns to JavaScript -->
-<script>
-  window.PROJECT_CUSTOM_COLUMNS = {{ custom_columns|tojson|safe }};
-</script>
+<!-- Archive Content (no tabs) -->
+<!-- DEBUG: show_archive = {{ show_archive }}, active_tab = {{ active_tab }} -->
+<div class="mt-4">
+  {% if show_archive %}
+  <!-- Archive Section -->
+    <div class="card">
+      <div class="card-header"><i class="bi bi-folder"></i> Datei-Archiv</div>
+      <div class="card-body">
+        <div class="mb-4">
+          <h5>Aktuelle Anforderungen</h5>
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>Dateiname</th>
+                  <th>Anzahl</th>
+                  <th>Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <i class="bi bi-list-check text-primary me-2"></i>
+                    <a href="{{ url_for('main.project_overview', project_id=project.id) }}">
+                      Aktuelle Anforderungen
+                    </a>
+                  </td>
+                  <td>
+                    <span class="badge bg-info">{{ req_with_versions|length }} Anforderungen</span>
+                  </td>
+                  <td>
+                    <a href="{{ url_for('main.project_overview', project_id=project.id) }}" class="btn btn-sm btn-outline-primary">
+                      <i class="bi bi-eye"></i> Anzeigen
+                    </a>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-<!-- Dynamic Columns Section -->
-<div class="card mb-4">
-  <div class="card-header d-flex justify-content-between align-items-center">
-    <span>Aktuelle Spalten</span>
-    <div>
-      <a
-        href="{{ url_for('main.export_excel', project_id=project.id) }}"
-        class="btn btn-sm btn-success me-2"
-      >
-        <i class="bi bi-file-earmark-excel"></i> Export als Excel
-      </a>
-      <button
-        class="btn btn-sm btn-info me-2"
-        type="button"
-        data-bs-toggle="modal"
-        data-bs-target="#importExcelModal"
-      >
-        <i class="bi bi-file-earmark-arrow-up"></i> Import aus Excel
-      </button>
-      <button
-        class="btn btn-sm btn-primary"
-        type="button"
-        data-bs-toggle="collapse"
-        data-bs-target="#addColumnForm"
-      >
-        <i class="bi bi-plus-circle"></i> Spalte hinzufügen
-      </button>
-    </div>
-  </div>
-  <div class="card-body">
-    <div class="mb-3">
-      <span class="badge bg-secondary me-1"
-        ><i class="bi bi-lock-fill"></i> Version</span
-      >
-      <span class="badge bg-secondary me-1"
-        ><i class="bi bi-lock-fill"></i> ID</span
-      >
-      <span class="badge bg-secondary me-1"
-        ><i class="bi bi-lock-fill"></i> Title</span
-      >
-      <span class="badge bg-secondary me-1"
-        ><i class="bi bi-lock-fill"></i> Beschreibung</span
-      >
-      {% for column in custom_columns %}
-      <span class="badge bg-primary me-1">
-        {{ column }}
-        <form
-          method="POST"
-          action="{{ url_for('main.remove_column', project_id=project.id, column_name=column) }}"
-          class="d-inline"
-          onsubmit="return confirm('Spalte {{ column }} wirklich löschen?')"
-        >
-          <button
-            type="submit"
-            class="btn-close btn-close-white ms-1"
-            aria-label="Close"
-            style="font-size: 0.5rem"
-          ></button>
-        </form>
-      </span>
-      {% endfor %}
-      <span class="badge bg-secondary me-1"
-        ><i class="bi bi-lock-fill"></i> Kategorie</span
-      >
-      <span class="badge bg-secondary me-1"
-        ><i class="bi bi-lock-fill"></i> Status</span
-      >
-      <span class="badge bg-secondary me-1"
-        ><i class="bi bi-lock-fill"></i> Aktionen</span
-      >
-    </div>
-    <div class="collapse" id="addColumnForm">
-      <form
-        method="POST"
-        action="{{ url_for('main.add_column', project_id=project.id) }}"
-        class="row g-3"
-      >
-        <div class="col-md-8">
-          <input
-            type="text"
-            class="form-control"
-            name="column_name"
-            placeholder="Neue Spalte (z.B. 'Priorität')"
-            required
-          />
+        <div class="mb-3">
+          <h5>Importierte Dateien</h5>
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>Dateiname</th>
+                  <th>Datum</th>
+                  <th>Hochgeladen von</th>
+                  <th>Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% set uploads =
+                project.files|selectattr('file_type','equalto','upload')|list %}
+                {% for file in uploads %}
+                <tr>
+                  <td>
+                    <i
+                      class="bi bi-file-earmark-arrow-up text-primary me-2"
+                    ></i>
+                    <a
+                      href="{{ url_for('main.project_overview', project_id=project.id, file_id=file.id) }}"
+                      >{{ file.filename }}</a
+                    >
+                  </td>
+                  <td>{{ file.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                  <td>
+                    {% if file.created_by %}{{
+                    file.created_by.email.split('@')[0] }}{% else %}-{% endif %}
+                  </td>
+                  <td>
+                    <a
+                      href="{{ url_for('main.download_file', file_id=file.id) }}"
+                      class="btn btn-sm btn-outline-primary me-2"
+                      ><i class="bi bi-download"></i> Download</a
+                    >
+                    {% if file.filename.endswith(('.xlsx', '.xls')) %}
+                    <a
+                      href="{{ url_for('agent.agent_page', project_id=project.id, preload_file=file.id) }}"
+                      class="btn btn-sm btn-outline-success"
+                      ><i class="bi bi-robot"></i> In KI laden</a
+                    >
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %} {% if uploads|length == 0 %}
+                <tr>
+                  <td colspan="4" class="text-center text-muted">
+                    Keine importierten Dateien vorhanden.
+                  </td>
+                </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div class="col-md-4">
-          <button type="submit" class="btn btn-primary">Hinzufügen</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
 
-<!-- FILTER SECTION - CLEARLY VISIBLE -->
-<div class="card mb-3 border-primary">
-  <div
-    class="card-header bg-primary text-white d-flex justify-content-between align-items-center"
-  >
-    <span><i class="bi bi-funnel-fill"></i> <strong>FILTER</strong></span>
-    <button
-      class="btn btn-sm btn-light"
-      type="button"
-      data-bs-toggle="collapse"
-      data-bs-target="#filterSection"
-    >
-      Filter ein/ausblenden
-    </button>
-  </div>
-  <div class="collapse show" id="filterSection">
-    <div class="card-body bg-light">
-      <div class="row g-3">
-        <div class="col-md-4">
-          <label for="filterText" class="form-label fw-bold">Textsuche</label>
-          <input
-            type="text"
-            class="form-control"
-            id="filterText"
-            placeholder="Suche in Title und Beschreibung..."
-          />
+        <div class="mb-3">
+          <h5>Erstellte / Exportierte Dateien</h5>
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>Dateiname</th>
+                  <th>Typ</th>
+                  <th>Datum</th>
+                  <th>Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% set exports =
+                project.files|rejectattr('file_type','equalto','upload')|list %}
+                {% for file in exports %}
+                <tr>
+                  <td>
+                    <i class="bi bi-file-earmark text-success me-2"></i>
+                    <a
+                      href="{{ url_for('main.project_overview', project_id=project.id, file_id=file.id) }}"
+                      >{{ file.filename }}</a
+                    >
+                  </td>
+                  <td>
+                    {% if file.file_type == 'export' %}
+                    <span class="badge bg-success">Export</span>
+                    {% else %}
+                    <span class="badge bg-secondary">{{ file.file_type }}</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ file.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                  <td>
+                    <a
+                      href="{{ url_for('main.download_file', file_id=file.id) }}"
+                      class="btn btn-sm btn-outline-primary me-2"
+                      ><i class="bi bi-download"></i> Download</a
+                    >
+                  </td>
+                </tr>
+                {% endfor %} {% if exports|length == 0 %}
+                <tr>
+                  <td colspan="4" class="text-center text-muted">
+                    Keine erstellten / exportierten Dateien vorhanden.
+                  </td>
+                </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div class="col-md-2">
-          <label for="filterStatus" class="form-label fw-bold">Status</label>
-          <select class="form-select" id="filterStatus">
-            <option value="">Alle</option>
-            <option value="Offen">Offen</option>
-            <option value="In Arbeit">In Arbeit</option>
-            <option value="Fertig">Fertig</option>
-          </select>
-        </div>
-        <div class="col-md-2">
-          <label for="filterCategory" class="form-label fw-bold"
-            >Kategorie</label
+      </div>
+    </div>
+  {% else %}
+  <!-- Requirements View -->
+    <!-- Pass custom columns to JavaScript -->
+    <script>
+      window.PROJECT_CUSTOM_COLUMNS = {{ custom_columns|tojson|safe }};
+    </script>
+
+    <!-- Dynamic Columns Section -->
+    <div class="card mb-4">
+      <div
+        class="card-header d-flex justify-content-between align-items-center"
+      >
+        <span>Aktuelle Spalten</span>
+        <div>
+          <a
+            href="{{ url_for('main.export_excel', project_id=project.id) }}"
+            class="btn btn-sm btn-success me-2"
           >
-          <select class="form-select" id="filterCategory">
-            <option value="">Alle</option>
-          </select>
-        </div>
-        <div class="col-md-4" id="dynamicFiltersContainer"></div>
-      </div>
-      <div class="row mt-3">
-        <div class="col-12">
-          <button class="btn btn-primary" id="applyFilters">
-            <i class="bi bi-check-circle"></i> Filter anwenden
+            <i class="bi bi-file-earmark-excel"></i> Export als Excel
+          </a>
+          <button
+            class="btn btn-sm btn-info me-2"
+            type="button"
+            data-bs-toggle="modal"
+            data-bs-target="#importExcelModal"
+          >
+            <i class="bi bi-file-earmark-arrow-up"></i> Import aus Excel
           </button>
-          <button class="btn btn-secondary" id="resetFilters">
-            <i class="bi bi-x-circle"></i> Zurücksetzen
+          <button
+            class="btn btn-sm btn-primary"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#addColumnForm"
+          >
+            <i class="bi bi-plus-circle"></i> Spalte hinzufügen
           </button>
-          <span class="ms-3 badge bg-info" id="filterResultCount"></span>
         </div>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- Requirements Table -->
-<div class="card">
-  <div class="card-header">Anforderungen</div>
-  <div class="card-body">
-    <div class="table-responsive">
-      <table class="table table-hover align-middle">
-        <thead class="table-light">
-          <tr>
-            <th style="width: 5%">Version</th>
-            <th style="width: 5%">ID</th>
-            <th style="width: 15%">Title</th>
-            <th style="width: 20%">Beschreibung</th>
-            {% for column in custom_columns %}
-            <th style="width: 8%">{{ column }}</th>
-            {% endfor %}
-            <th style="width: 8%">Kategorie</th>
-            <th style="width: 8%">Status</th>
-            <th style="width: 10%">Benutzer</th>
-            <th style="width: 20%">Aktionen</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% if req_with_versions %} {% for req, versions in req_with_versions
-          %}
-          <tr id="req-row-{{ req.id }}" data-req-id="{{ req.id }}">
-            <td>
-              <select
-                class="form-select form-select-sm version-selector"
-                data-req-id="{{ req.id }}"
-              >
-                {% for ver in versions %}
-                <option
-                  value="{{ ver.version_index }}"
-                  {%
-                  if
-                  loop.last
-                  %}selected{%
-                  endif
-                  %}
-                >
-                  {{ ver.version_label }}
-                </option>
-                {% endfor %}
-              </select>
-            </td>
-            <td>{{ loop.index }}</td>
-            <td class="title-cell">{{ versions[-1].title }}</td>
-            <td class="description-cell">{{ versions[-1].description }}</td>
-            {% for column in custom_columns %}
-            <td class="custom-data-cell" data-column="{{ column }}">
-              {{ versions[-1].get_custom_data().get(column, "–") }}
-            </td>
-            {% endfor %}
-            <td class="category-cell">{{ versions[-1].category or "–" }}</td>
-            <td class="status-cell">
-              <span class="badge bg-{{ versions[-1].get_status_color() }}"
-                >{{ versions[-1].status }}</span
-              >
-            </td>
-            <td class="user-cell">
-              {% if versions[-1].created_by %}
-              <small
-                class="text-muted"
-                title="Erstellt: {{ versions[-1].created_at.strftime('%d.%m.%Y %H:%M') }}{% if versions[-1].last_modified_by %} | Geändert: {{ versions[-1].last_modified_by.email }}{% endif %}"
-              >
-                <i class="bi bi-person"></i> {{
-                versions[-1].created_by.email.split('@')[0] }}
-              </small>
-              {% else %}
-              <small class="text-muted">–</small>
-              {% endif %}
-            </td>
-            <td class="actions-cell">
-              <form
-                method="POST"
-                action="{{ url_for('main.toggle_block_requirement', version_id=versions[-1].id) }}"
-                class="d-inline"
-              >
-                <button
-                  type="submit"
-                  class="btn btn-sm {% if versions[-1].is_blocked %}btn-success{% else %}btn-warning{% endif %} mb-1"
-                >
-                  <i
-                    class="bi {% if versions[-1].is_blocked %}bi-unlock{% else %}bi-lock{% endif %}"
-                  ></i>
-                  {% if versions[-1].is_blocked %}Freigeben{% else
-                  %}Blockieren{% endif %}
-                </button>
-              </form>
+      <div class="card-body">
+        <div class="mb-3">
+          <span class="badge bg-secondary me-1"
+            ><i class="bi bi-lock-fill"></i> Version</span
+          >
+          <span class="badge bg-secondary me-1"
+            ><i class="bi bi-lock-fill"></i> ID</span
+          >
+          <span class="badge bg-secondary me-1"
+            ><i class="bi bi-lock-fill"></i> Title</span
+          >
+          <span class="badge bg-secondary me-1"
+            ><i class="bi bi-lock-fill"></i> Beschreibung</span
+          >
+          {% for column in custom_columns %}
+          <span class="badge bg-primary me-1">
+            {{ column }}
+            <form
+              method="POST"
+              action="{{ url_for('main.remove_column', project_id=project.id, column_name=column) }}"
+              class="d-inline"
+              onsubmit="return confirm('Spalte {{ column }} wirklich löschen?')"
+            >
               <button
-                class="btn btn-sm btn-outline-primary mb-1 edit-requirement-btn"
-                data-req-id="{{ req.id }}"
-                data-version-id="{{ versions[-1].id }}"
-                {%
-                if
-                versions[-1].is_blocked
-                %}disabled{%
-                endif
-                %}
-              >
-                <i class="bi bi-pencil"></i> Bearbeiten
-              </button>
-              <form
-                method="POST"
-                action="{{ url_for('main.regenerate_requirement', req_id=req.id) }}"
-                class="d-inline"
-              >
-                <button
-                  type="submit"
-                  class="btn btn-sm btn-outline-success mb-1"
-                  {%
-                  if
-                  versions[-1].is_blocked
-                  %}disabled{%
-                  endif
-                  %}
-                >
-                  <i class="bi bi-stars"></i> Neu generieren
-                </button>
-              </form>
-              <form
-                method="POST"
-                action="{{ url_for('main.delete_requirement_version', version_id=versions[-1].id) }}"
-                class="d-inline delete-version-form"
-                data-req-id="{{ req.id }}"
-              >
-                <button
-                  type="submit"
-                  class="btn btn-sm btn-outline-danger mb-1"
-                  onclick="return confirm('Möchten Sie Version {{ versions[-1].version_label }} wirklich löschen?')"
-                  {%
-                  if
-                  versions[-1].is_blocked
-                  %}disabled{%
-                  endif
-                  %}
-                >
-                  <i class="bi bi-trash"></i> Löschen
-                </button>
-              </form>
-              <div class="d-none" id="versions-data-{{ req.id }}">
-                {% for ver in versions %}
-                <div
-                  class="version-data"
-                  data-version-index="{{ ver.version_index }}"
-                  data-version-id="{{ ver.id }}"
-                  data-title="{{ ver.title }}"
-                  data-description="{{ ver.description }}"
-                  data-category="{{ ver.category or '' }}"
-                  data-status="{{ ver.status }}"
-                  data-status-color="{{ ver.get_status_color() }}"
-                  data-custom-data="{{ ver.get_custom_data_json()|safe }}"
-                ></div>
-                {% endfor %}
-              </div>
-            </td>
-          </tr>
-          {% endfor %} {% else %}
-          <tr>
-            <td colspan="{{ 8 + custom_columns|length }}" class="text-center">
-              Noch keine Anforderungen vorhanden. Nutzen Sie den
-              <a href="{{ url_for('agent.agent_page', project_id=project.id) }}"
-                >KI-Agenten</a
-              >.
-            </td>
-          </tr>
-          {% endif %}
-        </tbody>
-      </table>
+                type="submit"
+                class="btn-close btn-close-white ms-1"
+                aria-label="Close"
+                style="font-size: 0.5rem"
+              ></button>
+            </form>
+          </span>
+          {% endfor %}
+          <span class="badge bg-secondary me-1"
+            ><i class="bi bi-lock-fill"></i> Kategorie</span
+          >
+          <span class="badge bg-secondary me-1"
+            ><i class="bi bi-lock-fill"></i> Status</span
+          >
+          <span class="badge bg-secondary me-1"
+            ><i class="bi bi-lock-fill"></i> Aktionen</span
+          >
+        </div>
+        <div class="collapse" id="addColumnForm">
+          <form
+            method="POST"
+            action="{{ url_for('main.add_column', project_id=project.id) }}"
+            class="row g-3"
+          >
+            <div class="col-md-8">
+              <input
+                type="text"
+                class="form-control"
+                name="column_name"
+                placeholder="Neue Spalte (z.B. 'Priorität')"
+                required
+              />
+            </div>
+            <div class="col-md-4">
+              <button type="submit" class="btn btn-primary">Hinzufügen</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
+
+    <!-- FILTER SECTION - CLEARLY VISIBLE -->
+    <div class="card mb-3 border-primary">
+      <div
+        class="card-header bg-primary text-white d-flex justify-content-between align-items-center"
+      >
+        <span><i class="bi bi-funnel-fill"></i> <strong>FILTER</strong></span>
+        <button
+          class="btn btn-sm btn-light"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#filterSection"
+        >
+          Filter ein/ausblenden
+        </button>
+      </div>
+      <div class="collapse show" id="filterSection">
+        <div class="card-body bg-light">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label for="filterText" class="form-label fw-bold"
+                >Textsuche</label
+              >
+              <input
+                type="text"
+                class="form-control"
+                id="filterText"
+                placeholder="Suche in Title und Beschreibung..."
+              />
+            </div>
+            <div class="col-md-2">
+              <label for="filterStatus" class="form-label fw-bold"
+                >Status</label
+              >
+              <select class="form-select" id="filterStatus">
+                <option value="">Alle</option>
+                <option value="Offen">Offen</option>
+                <option value="In Arbeit">In Arbeit</option>
+                <option value="Fertig">Fertig</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label for="filterCategory" class="form-label fw-bold"
+                >Kategorie</label
+              >
+              <select class="form-select" id="filterCategory">
+                <option value="">Alle</option>
+              </select>
+            </div>
+            <div class="col-md-4" id="dynamicFiltersContainer"></div>
+          </div>
+          <div class="row mt-3">
+            <div class="col-12">
+              <button class="btn btn-primary" id="applyFilters">
+                <i class="bi bi-check-circle"></i> Filter anwenden
+              </button>
+              <button class="btn btn-secondary" id="resetFilters">
+                <i class="bi bi-x-circle"></i> Zurücksetzen
+              </button>
+              <span class="ms-3 badge bg-info" id="filterResultCount"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Requirements Table -->
+    <div class="card">
+      <div class="card-header">Anforderungen</div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th style="width: 5%">Version</th>
+                <th style="width: 5%">ID</th>
+                <th style="width: 15%">Title</th>
+                <th style="width: 20%">Beschreibung</th>
+                {% for column in custom_columns %}
+                <th style="width: 8%">{{ column }}</th>
+                {% endfor %}
+                <th style="width: 8%">Kategorie</th>
+                <th style="width: 8%">Status</th>
+                <th style="width: 10%">Benutzer</th>
+                <th style="width: 20%">Aktionen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if req_with_versions %} {% for req, versions in
+              req_with_versions %}
+              <tr id="req-row-{{ req.id }}" data-req-id="{{ req.id }}">
+                <td>
+                  <select
+                    class="form-select form-select-sm version-selector"
+                    data-req-id="{{ req.id }}"
+                  >
+                    {% for ver in versions %}
+                    <option
+                      value="{{ ver.version_index }}"
+                      {%
+                      if
+                      loop.last
+                      %}selected{%
+                      endif
+                      %}
+                    >
+                      {{ ver.version_label }}
+                    </option>
+                    {% endfor %}
+                  </select>
+                </td>
+                <td>{{ loop.index }}</td>
+                <td class="title-cell">{{ versions[-1].title }}</td>
+                <td class="description-cell">{{ versions[-1].description }}</td>
+                {% for column in custom_columns %}
+                <td class="custom-data-cell" data-column="{{ column }}">
+                  {{ versions[-1].get_custom_data().get(column, "–") }}
+                </td>
+                {% endfor %}
+                <td class="category-cell">
+                  {{ versions[-1].category or "–" }}
+                </td>
+                <td class="status-cell">
+                  <span class="badge bg-{{ versions[-1].get_status_color() }}"
+                    >{{ versions[-1].status }}</span
+                  >
+                </td>
+                <td class="user-cell">
+                  {% if versions[-1].created_by %}
+                  <small
+                    class="text-muted"
+                    title="Erstellt: {{ versions[-1].created_at.strftime('%d.%m.%Y %H:%M') }}{% if versions[-1].last_modified_by %} | Geändert: {{ versions[-1].last_modified_by.email }}{% endif %}"
+                  >
+                    <i class="bi bi-person"></i> {{
+                    versions[-1].created_by.email.split('@')[0] }}
+                  </small>
+                  {% else %}
+                  <small class="text-muted">–</small>
+                  {% endif %}
+                </td>
+                <td class="actions-cell">
+                  <form
+                    method="POST"
+                    action="{{ url_for('main.toggle_block_requirement', version_id=versions[-1].id) }}"
+                    class="d-inline"
+                  >
+                    <button
+                      type="submit"
+                      class="btn btn-sm {% if versions[-1].is_blocked %}btn-success{% else %}btn-warning{% endif %} mb-1"
+                    >
+                      <i
+                        class="bi {% if versions[-1].is_blocked %}bi-unlock{% else %}bi-lock{% endif %}"
+                      ></i>
+                      {% if versions[-1].is_blocked %}Freigeben{% else
+                      %}Blockieren{% endif %}
+                    </button>
+                  </form>
+                  <button
+                    class="btn btn-sm btn-outline-primary mb-1 edit-requirement-btn"
+                    data-req-id="{{ req.id }}"
+                    data-version-id="{{ versions[-1].id }}"
+                    {%
+                    if
+                    versions[-1].is_blocked
+                    %}disabled{%
+                    endif
+                    %}
+                  >
+                    <i class="bi bi-pencil"></i> Bearbeiten
+                  </button>
+                  <form
+                    method="POST"
+                    action="{{ url_for('main.regenerate_requirement', req_id=req.id) }}"
+                    class="d-inline"
+                  >
+                    <button
+                      type="submit"
+                      class="btn btn-sm btn-outline-success mb-1"
+                      {%
+                      if
+                      versions[-1].is_blocked
+                      %}disabled{%
+                      endif
+                      %}
+                    >
+                      <i class="bi bi-stars"></i> Neu generieren
+                    </button>
+                  </form>
+                  <form
+                    method="POST"
+                    action="{{ url_for('main.delete_requirement_version', version_id=versions[-1].id) }}"
+                    class="d-inline delete-version-form"
+                    data-req-id="{{ req.id }}"
+                  >
+                    <button
+                      type="submit"
+                      class="btn btn-sm btn-outline-danger mb-1"
+                      onclick="return confirm('Möchten Sie Version {{ versions[-1].version_label }} wirklich löschen?')"
+                      {%
+                      if
+                      versions[-1].is_blocked
+                      %}disabled{%
+                      endif
+                      %}
+                    >
+                      <i class="bi bi-trash"></i> Löschen
+                    </button>
+                  </form>
+                  <div class="d-none" id="versions-data-{{ req.id }}">
+                    {% for ver in versions %}
+                    <div
+                      class="version-data"
+                      data-version-index="{{ ver.version_index }}"
+                      data-version-id="{{ ver.id }}"
+                      data-title="{{ ver.title }}"
+                      data-description="{{ ver.description }}"
+                      data-category="{{ ver.category or '' }}"
+                      data-status="{{ ver.status }}"
+                      data-status-color="{{ ver.get_status_color() }}"
+                      data-custom-data="{{ ver.get_custom_data_json()|safe }}"
+                    ></div>
+                    {% endfor %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %} {% else %}
+              <tr>
+                <td
+                  colspan="{{ 8 + custom_columns|length }}"
+                  class="text-center"
+                >
+                  Noch keine Anforderungen vorhanden. Nutzen Sie den
+                  <a
+                    href="{{ url_for('agent.agent_page', project_id=project.id) }}"
+                    >KI-Agenten</a
+                  >.
+                </td>
+              </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
   </div>
 </div>
 
