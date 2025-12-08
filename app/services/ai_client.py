@@ -9,7 +9,127 @@ from openai import OpenAI
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 import config
 
-def generate_requirements(user_description: str | None, inputs: dict, columns: list = None) -> list[dict]:
+
+class AIClient:
+    """AI Client for requirements analysis and generation"""
+
+    def __init__(self):
+        self.api_key = config.OPENAI_API_KEY
+        self.model = config.OPENAI_MODEL or "gpt-4o-mini"
+        if not self.api_key:
+            raise ValueError("OPENAI_API_KEY environment variable must be set.")
+        self.client = OpenAI(api_key=self.api_key)
+
+    def analyze_requirements(self, requirements_text: str) -> dict:
+        """
+        Analyze requirements text and provide insights
+
+        Args:
+            requirements_text (str): The requirements text to analyze
+
+        Returns:
+            dict: Analysis results
+        """
+        system_prompt = """Du bist ein erfahrener Requirements Engineer. Analysiere die gegebenen Anforderungen und gib eine strukturierte Bewertung.
+
+PHASE 1: Strukturanalyse - Prüfe Vollständigkeit, Klarheit und Konsistenz
+PHASE 2: Inhaltsanalyse - Bewerte SMART-Kriterien, Normenkonformität und Testbarkeit
+PHASE 3: Risikoanalyse - Identifiziere potenzielle Probleme oder Lücken
+PHASE 4: Empfehlungen - Gib konkrete Verbesserungsvorschläge
+
+Antworte im JSON-Format mit den Schlüsseln: struktur, inhalt, risiko, empfehlungen."""
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Analysiere diese Anforderungen:\n\n{requirements_text}"}
+                ],
+                temperature=0.2,
+                max_tokens=800
+            )
+
+            response_text = response.choices[0].message.content.strip()
+
+            # Try to parse as JSON, fallback to text
+            try:
+                analysis = json.loads(response_text)
+            except json.JSONDecodeError:
+                analysis = {
+                    "struktur": "Analyse durchgeführt",
+                    "inhalt": response_text[:200] + "..." if len(response_text) > 200 else response_text,
+                    "risiko": "Weitere Prüfung empfohlen",
+                    "empfehlungen": "Detaillierte Analyse verfügbar"
+                }
+
+            return analysis
+
+        except Exception as e:
+            return {
+                "error": f"Analyse fehlgeschlagen: {str(e)}",
+                "struktur": "Nicht analysiert",
+                "inhalt": "Nicht analysiert",
+                "risiko": "Unbekannt",
+                "empfehlungen": "Manuelle Prüfung erforderlich"
+            }
+
+    def suggest_improvements(self, requirement) -> list:
+        """
+        Suggest improvements for a specific requirement
+
+        Args:
+            requirement: The requirement object to improve
+
+        Returns:
+            list: List of improvement suggestions
+        """
+        system_prompt = """Du bist ein erfahrener Requirements Engineer. Verbessere die gegebene Anforderung nach folgenden Kriterien:
+
+1. SMART-Prinzip (Spezifisch, Messbar, Erreichbar, Relevant, Terminiert)
+2. Normenkonformität (z.B. nach IEEE 830)
+3. Präzise Formulierung (eindeutige Sprache)
+4. Testbarkeit (klare Akzeptanzkriterien)
+
+Gib 3-5 konkrete Verbesserungsvorschläge als Liste zurück."""
+
+        requirement_text = f"Titel: {requirement.title}\nBeschreibung: {requirement.description}"
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Verbessere diese Anforderung:\n\n{requirement_text}"}
+                ],
+                temperature=0.3,
+                max_tokens=600
+            )
+
+            response_text = response.choices[0].message.content.strip()
+
+            # Try to extract suggestions from response
+            suggestions = []
+            lines = response_text.split('\n')
+
+            for line in lines:
+                line = line.strip()
+                if line and (line[0].isdigit() or line.startswith('-') or line.startswith('•')):
+                    # Clean up the suggestion
+                    clean_suggestion = re.sub(r'^[\d\.\-\•]+\s*', '', line)
+                    if clean_suggestion and len(clean_suggestion) > 10:
+                        suggestions.append(clean_suggestion)
+
+            # If no structured suggestions found, return the whole response as one suggestion
+            if not suggestions:
+                suggestions = [response_text]
+
+            return suggestions[:5]  # Limit to 5 suggestions
+
+        except Exception as e:
+            return [f"Verbesserungsvorschläge konnten nicht generiert werden: {str(e)}"]
+
+def generate_requirements(user_description: str | None, inputs: dict, columns: list = None, existing_requirements: list[dict] = None) -> list[dict]:
     """
     Calls OpenAI API to generate requirements based on user description and inputs.
 
@@ -17,10 +137,11 @@ def generate_requirements(user_description: str | None, inputs: dict, columns: l
         user_description (str | None): Optional user description of requirements.
         inputs (dict): Key-value pairs for additional context.
         columns (list): Optional list of column names for the project.
+        existing_requirements (list[dict]): Optional list of existing requirements to optimize.
 
     Returns:
         list[dict]: List of requirement dicts with dynamic columns based on project.
-    
+
     Raises:
         ValueError: If OPENAI_API_KEY is not set.
         RuntimeError: If OpenAI API call fails or response is invalid.
@@ -28,7 +149,28 @@ def generate_requirements(user_description: str | None, inputs: dict, columns: l
     # Get configuration
     api_key = config.OPENAI_API_KEY
     model = config.OPENAI_MODEL or "gpt-4o-mini"
-    system_prompt = config.get_system_prompt(columns)
+
+    # New structured system prompt based on 4-phase methodology
+    if existing_requirements:
+        system_prompt = """Du bist ein erfahrener Requirements Engineer. Arbeite nach dem 4-Phasen-Modell:
+
+PHASE 1 & 2 (Analyse/Struktur): Analysiere die übergebenen bestehenden Anforderungen. Verstehe den Kontext und die Struktur.
+
+PHASE 3 (Erstellung): Verbessere jede einzelne Anforderung inhaltlich (SMART, Normen, Präzision). Behalte die Struktur bei, aber optimiere den Inhalt.
+
+PHASE 4 (Review): Führe einen Qualitätscheck durch - jede Anforderung muss präzise, messbar und normenkonform sein.
+
+WICHTIG: Antworte nur mit den verbesserten Anforderungen im geforderten JSON-Format. Kein zusätzlicher Text."""
+    else:
+        system_prompt = """Du bist ein erfahrener Requirements Engineer. Arbeite nach dem 4-Phasen-Modell:
+
+PHASE 1 & 2 (Analyse/Struktur): Verstehe den Kontext und strukturiere die Anforderungen.
+
+PHASE 3 (Erstellung): Formuliere Anforderungen nach der Satzschablone "Das System muss...". Stelle sicher, dass sie SMART, normenkonform und präzise sind.
+
+PHASE 4 (Review): Qualitätscheck - jede Anforderung muss messbar, akzeptabel und testbar sein.
+
+WICHTIG: Antworte nur mit den generierten Anforderungen im geforderten JSON-Format. Kein zusätzlicher Text."""
 
     if not api_key:
         raise ValueError("OPENAI_API_KEY environment variable must be set.")

@@ -12,8 +12,8 @@ endblock %} {% block content %}
 
   <h1 class="mb-4">KI-Agent für Projekt: {{ project.name }}</h1>
   <p class="mb-4">
-    Generiere Requirements mit Hilfe von KI. Gib eine optionale Beschreibung und
-    zusätzliche Key-Value-Paare ein.
+    Generiere Requirements mit Hilfe von KI. Gib eine Beschreibung ein oder lade
+    eine bestehende Excel-Datei hoch.
   </p>
 
   <div class="card">
@@ -21,18 +21,19 @@ endblock %} {% block content %}
       <form id="agent-form">
         <div class="mb-3">
           <label for="maschine" class="form-label">Maschine</label>
-          <input
-            type="text"
-            class="form-control"
-            id="maschine"
-            name="maschine"
-            placeholder="Gib hier den Maschinennamen oder die Maschine ein (z. B. "Maschine A")."
-          />
-          <small class="form-text text-muted">Optional: Auf welche Maschine beziehen sich die Anforderungen?</small>
+          <input type="text" class="form-control" id="maschine" name="maschine"
+          placeholder="Gib hier den Maschinennamen oder die Maschine ein (z. B.
+          "Maschine A")." />
+          <small class="form-text text-muted"
+            >Optional: Auf welche Maschine beziehen sich die
+            Anforderungen?</small
+          >
         </div>
 
         <div class="mb-3">
-          <label for="user_description" class="form-label">User-Beschreibung (optional)</label>
+          <label for="user_description" class="form-label"
+            >User-Beschreibung (optional)</label
+          >
           <textarea
             class="form-control"
             id="user_description"
@@ -40,33 +41,28 @@ endblock %} {% block content %}
             rows="5"
             placeholder="Beschreibe die Requirements, die du generieren möchtest. Dieses Feld ist optional."
           ></textarea>
-          <small class="form-text text-muted">Gib eine allgemeine Beschreibung der gewünschten Requirements ein. Wenn du keine Beschreibung angibst, werden allgemeine Requirements generiert.</small>
+          <small class="form-text text-muted"
+            >Gib eine allgemeine Beschreibung der gewünschten Requirements ein.
+            Wenn du keine Beschreibung angibst, werden allgemeine Requirements
+            generiert.</small
+          >
         </div>
 
         <div class="mb-3">
-          <label class="form-label">Zusätzliche Inputs (Key-Value-Paare)</label>
-          <div id="inputs-container">
-            <div class="input-group mb-2">
-              <input
-                type="text"
-                class="form-control"
-                placeholder="Key"
-                name="key[]"
-              />
-              <input
-                type="text"
-                class="form-control"
-                placeholder="Value"
-                name="value[]"
-              />
-              <button type="button" class="btn btn-outline-danger remove-input">
-                Entfernen
-              </button>
-            </div>
-          </div>
-          <button type="button" class="btn btn-outline-primary" id="add-input">
-            Key-Value-Paar hinzufügen
-          </button>
+          <label for="excel_file" class="form-label"
+            >Bestehende Anforderungen hochladen (Excel)</label
+          >
+          <input
+            type="file"
+            class="form-control"
+            id="excel_file"
+            name="excel_file"
+            accept=".xlsx,.xls"
+          />
+          <small class="form-text text-muted"
+            >Lade eine bestehende Excel-Tabelle hoch, damit die KI diese
+            analysieren und verbessern kann.</small
+          >
         </div>
 
         <button type="submit" class="btn btn-primary" id="generate-btn">
@@ -85,28 +81,6 @@ endblock %} {% block content %}
 </div>
 
 <script>
-  // Add new key-value pair input
-  document.getElementById("add-input").addEventListener("click", function () {
-    const container = document.getElementById("inputs-container");
-    const div = document.createElement("div");
-    div.className = "input-group mb-2";
-    div.innerHTML = `
-    <input type="text" class="form-control" placeholder="Key" name="key[]">
-    <input type="text" class="form-control" placeholder="Value" name="value[]">
-    <button type="button" class="btn btn-outline-danger remove-input">Entfernen</button>
-  `;
-    container.appendChild(div);
-  });
-
-  // Remove key-value pair input
-  document
-    .getElementById("inputs-container")
-    .addEventListener("click", function (e) {
-      if (e.target.classList.contains("remove-input")) {
-        e.target.parentElement.remove();
-      }
-    });
-
   // Handle form submission
   document
     .getElementById("agent-form")
@@ -122,27 +96,13 @@ endblock %} {% block content %}
       spinner.classList.remove("d-none");
       messageDiv.classList.add("d-none");
 
-  // Collect form data
-  const formData = new FormData(e.target);
-  const maschine = formData.get("maschine") || "";
-  const userDescription = formData.get("user_description") || "";
-
-  // Collect key-value pairs as array
-      const keys = formData.getAll("key[]");
-      const values = formData.getAll("value[]");
-      const inputs = [];
-
-      keys.forEach((key, i) => {
-        if (key && key.trim() && values[i] && values[i].trim()) {
-          inputs.push({
-            key: key.trim(),
-            value: values[i].trim(),
-          });
-        }
-      });
+      // Collect form data
+      const formData = new FormData(e.target);
+      const maschine = formData.get("maschine") || "";
+      const userDescription = formData.get("user_description") || "";
+      const fileInput = document.getElementById("excel_file");
 
       // Combine all user inputs into the prompt content that will be sent to the AI.
-      // The AI client expects a `user_description` string and an `inputs` dict.
       // We include the Maschine and the Beschreibung in the user_description so
       // that the prompt contains everything the user entered.
       let combinedDescription = "";
@@ -153,19 +113,19 @@ endblock %} {% block content %}
         combinedDescription += `Beschreibung: ${userDescription.trim()}\n`;
       }
 
-      const data = {
-        user_description: combinedDescription || null,
-        inputs: inputs,
-      };
+      const payload = new FormData();
+      if (fileInput.files[0]) {
+        payload.append("excel_file", fileInput.files[0]);
+      }
+      payload.append("user_description", combinedDescription);
+      // Send empty inputs object to maintain backend compatibility
+      payload.append("inputs", JSON.stringify([]));
 
       // Send POST request
       fetch("/agent/generate/{{ project.id }}", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         credentials: "same-origin",
-        body: JSON.stringify(data),
+        body: payload,
       })
         .then((response) => response.json())
         .then((result) => {
