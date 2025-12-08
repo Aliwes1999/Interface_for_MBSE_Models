@@ -301,11 +301,6 @@ KRITISCH WICHTIG:
 - Antworte NUR mit diesem JSON, ohne zusätzlichen Text davor oder danach."""
 
     try:
-        print(f"DEBUG optimize_excel_requirements: columns={columns}")
-        print(f"DEBUG optimize_excel_requirements: input count={len(existing_requirements)}")
-        if existing_requirements:
-            print(f"DEBUG optimize_excel_requirements: first item sample={existing_requirements[0]}")
-        
         response = client.chat.completions.create(
             model=model,
             messages=[
@@ -318,17 +313,10 @@ KRITISCH WICHTIG:
         )
 
         response_text = response.choices[0].message.content.strip()
-        print(f"DEBUG optimize_excel_requirements: AI response length={len(response_text)}")
-        print(f"DEBUG optimize_excel_requirements: AI response preview={response_text[:200] if len(response_text) > 200 else response_text}")
-        
         requirements = _parse_json_response(response_text, columns)
-        print(f"DEBUG optimize_excel_requirements: output count={len(requirements)}")
         return requirements
 
     except Exception as e:
-        print(f"ERROR in optimize_excel_requirements: {str(e)}")
-        import traceback
-        traceback.print_exc()
         raise RuntimeError(f"OpenAI request failed: {str(e)}")
 
 
