@@ -2,8 +2,9 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from sqlalchemy import func, and_
 import json
+import os
 from . import db
-from .models import Project, Requirement, RequirementVersion
+from .models import Project, Requirement, RequirementVersion, ProjectFile
 from .services.ai_client import generate_requirements
 
 bp = Blueprint('main', __name__)
@@ -32,8 +33,30 @@ def create():
 @login_required
 def manage_project(project_id):
     project = Project.query.get_or_404(project_id)
-    if project.user_id != current_user.id:
+    if project.user_id != current_user.id and current_user not in project.shared_with:
         abort(403)
+    
+    # Show entry page with two options: generate or upload
+    return render_template("project_entry.html", project=project)
+
+
+@bp.route("/project/<int:project_id>/overview")
+@login_required
+def project_overview(project_id):
+    project = Project.query.get_or_404(project_id)
+    if project.user_id != current_user.id and current_user not in project.shared_with:
+        abort(403)
+
+    # Read explicit active_tab (e.g. 'files') from query string. If not provided
+    # but a file_id is present, default to the requirements tab so the user can
+    # immediately edit the imported/generated requirements.
+    focus_file_id = request.args.get('file_id', type=int)
+    active_tab = request.args.get('active_tab')
+    if not active_tab and focus_file_id:
+        active_tab = 'requirements'
+    
+    # Determine whether to show archive or requirements
+    show_archive = (active_tab == 'files')
 
     # Get all requirements with ALL versions (not just the latest)
     # Filter out deleted requirements
@@ -54,11 +77,20 @@ def manage_project(project_id):
     # Get custom columns for this project
     custom_columns = project.get_custom_columns()
     
+    # Get latest snapshot/export/generated file for quick access
+    latest_snapshot = ProjectFile.query.filter_by(project_id=project_id).filter(
+        ProjectFile.file_type.in_(['export', 'generated'])
+    ).order_by(ProjectFile.created_at.desc()).first()
+    
     return render_template(
         "create.html", 
         project=project, 
         req_with_versions=req_with_versions,
-        custom_columns=custom_columns
+        custom_columns=custom_columns,
+        latest_snapshot=latest_snapshot,
+        active_tab=active_tab,
+        focus_file_id=focus_file_id,
+        show_archive=show_archive
     )
 
 @bp.route("/deleted_requirements")
@@ -100,6 +132,55 @@ def requirement_history(rid):
     # The 'versions' relationship is already ordered by version_index
     versions = req.versions
     return render_template("requirement_history.html", req=req, versions=versions)
+
+
+@bp.route('/project/<int:project_id>/file/<int:file_id>')
+@login_required
+def view_project_file(project_id, file_id):
+    """Show a detail page for a specific ProjectFile (preview columns / data)."""
+    project = Project.query.get_or_404(project_id)
+    if project.user_id != current_user.id and current_user not in project.shared_with:
+        abort(403)
+
+    project_file = ProjectFile.query.get_or_404(file_id)
+    if project_file.project_id != project.id:
+        abort(404)
+
+    preview = None
+    columns = []
+    try:
+        # Only attempt to parse Excel uploads
+        if project_file.filepath and project_file.filename.endswith(('.xlsx', '.xls')) and project_file.file_type == 'upload':
+            preview = parse_excel_to_data(project_file.filepath)
+            # preview expected as list of dicts; derive columns from keys of first row
+            if preview and isinstance(preview, list) and len(preview) > 0:
+                columns = list(preview[0].keys())
+    except Exception:
+        preview = None
+
+    return render_template('file_view.html', project=project, file=project_file, preview=preview, columns=columns)
+@bp.route('/file/<int:file_id>/download')
+@login_required
+def download_file(file_id):
+    """Download a project file"""
+    project_file = ProjectFile.query.get_or_404(file_id)
+    project = project_file.project
+    
+    # Authorization check
+    if project.user_id != current_user.id and current_user not in project.shared_with:
+        abort(403)
+    
+    # Check if file exists
+    if not os.path.exists(project_file.filepath):
+        abort(404)
+    
+    from flask import send_file
+    return send_file(
+        project_file.filepath,
+        as_attachment=True,
+        download_name=project_file.filename
+    )
+
 
 
 @bp.route("/project/delete/<int:project_id>", methods=['POST'])
@@ -572,16 +653,30 @@ def export_excel(project_id):
     col_letter = chr(col_letter_start + len(custom_columns) + 1)
     ws.column_dimensions[col_letter].width = 15  # Status
     
-    # Save to BytesIO
-    output = BytesIO()
-    wb.save(output)
-    output.seek(0)
-    
-    # Create filename
-    filename = f"requirements_{project.name.replace(' ', '_')}.xlsx"
-    
+    # Generate filename with timestamp
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f"requirements_{project.name.replace(' ', '_')}_{timestamp}.xlsx"
+
+    # Save file to uploads directory
+    uploads_dir = os.path.join('uploads')
+    os.makedirs(uploads_dir, exist_ok=True)
+    filepath = os.path.join(uploads_dir, filename)
+    wb.save(filepath)
+
+    # Create database entry for exported file
+    project_file = ProjectFile(
+        project_id=project_id,
+        filename=filename,
+        filepath=filepath,
+        file_type='export',
+        created_by_id=current_user.id
+    )
+    db.session.add(project_file)
+    db.session.commit()
+
+    # Return file for download
     return send_file(
-        output,
+        filepath,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         as_attachment=True,
         download_name=filename

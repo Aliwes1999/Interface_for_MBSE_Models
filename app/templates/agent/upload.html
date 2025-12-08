@@ -1,0 +1,106 @@
+{% extends "base.html" %} {% block title %}Excel hochladen und optimieren - {{
+project.name }}{% endblock %} {% block content %}
+<div class="container mt-5">
+  <div class="mb-3">
+    <a
+      href="{{ url_for('main.manage_project', project_id=project.id) }}"
+      class="btn btn-secondary"
+    >
+      <i class="bi bi-arrow-left"></i> Zurück zum Projekt
+    </a>
+  </div>
+
+  <h1 class="mb-4">
+    Excel für Projekt {{ project.name }} hochladen und optimieren
+  </h1>
+  <p>
+    Lade eine Excel-Datei (.xlsx/.xls) hoch. Die KI analysiert die Datei und
+    schlägt Verbesserungen bzw. neue Anforderungen vor.
+  </p>
+
+  <div class="card">
+    <div class="card-body">
+      <form
+        id="upload-form"
+        method="POST"
+        action="{{ url_for('agent.generate_requirements_route', project_id=project.id) }}"
+        enctype="multipart/form-data"
+      >
+        <div class="mb-3">
+          <label for="excel_file" class="form-label">Excel-Datei</label>
+          <input
+            type="file"
+            class="form-control"
+            id="excel_file"
+            name="excel_file"
+            accept=".xlsx,.xls"
+            required
+          />
+          <div class="form-text">
+            Lade eine Excel-Datei hoch, die die bestehenden Anforderungen
+            enthält.
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label for="user_description" class="form-label"
+            >Optionale Beschreibung / Hinweise</label
+          >
+          <textarea
+            class="form-control"
+            id="user_description"
+            name="user_description"
+            rows="4"
+            placeholder="Gib zusätzliche Hinweise zur Optimierung (z. B. Fokus, Stil, Priorität)..."
+          ></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+          Hochladen und optimieren
+        </button>
+      </form>
+
+      <div id="upload-result" class="mt-3"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // optional: intercept form and show inline result (keeps current behavior of agent.generate endpoint)
+  const form = document.getElementById("upload-form");
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    const resultDiv = document.getElementById("upload-result");
+    const btn = form.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    resultDiv.className = "";
+    resultDiv.innerHTML = "";
+
+    const fd = new FormData(form);
+    fetch(form.action, {
+      method: "POST",
+      credentials: "same-origin",
+      body: fd,
+    })
+      .then((r) => r.json())
+      .then((result) => {
+        if (result.ok) {
+          resultDiv.className = "alert alert-success";
+          resultDiv.innerHTML = `<strong>Erfolg:</strong> ${result.count} Requirement(s) erstellt. Sie werden weitergeleitet...`;
+          setTimeout(() => {
+            window.location.href = result.redirect;
+          }, 1500);
+        } else {
+          resultDiv.className = "alert alert-danger";
+          resultDiv.innerHTML = `<strong>Fehler:</strong> ${result.error}`;
+          btn.disabled = false;
+        }
+      })
+      .catch((err) => {
+        resultDiv.className = "alert alert-danger";
+        resultDiv.innerHTML = `<strong>Netzwerkfehler:</strong> ${err.message}`;
+        btn.disabled = false;
+      });
+  });
+</script>
+{% endblock %}

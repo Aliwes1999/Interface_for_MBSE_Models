@@ -41,9 +41,12 @@ class Project(db.Model):
     custom_columns = db.Column(db.Text, default='[]')  # Stores list of column names as JSON
     
     requirements = db.relationship("Requirement", backref="project", lazy=True, cascade="all, delete-orphan")
-    
+
+    # Relationship to project files
+    files = db.relationship('ProjectFile', backref='project', lazy=True, cascade="all, delete-orphan")
+
     # Many-to-many relationship for shared users
-    shared_with = db.relationship('User', secondary=project_user_association, 
+    shared_with = db.relationship('User', secondary=project_user_association,
                                    backref=db.backref('shared_projects', lazy='dynamic'))
 
     def __repr__(self):
@@ -175,3 +178,18 @@ class RequirementVersion(db.Model):
             return self.requirement.project.is_accessible_by(user)
         # If blocked, only the blocker can unblock
         return self.blocked_by_id == user.id
+
+class ProjectFile(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
+    filename = db.Column(db.String(255), nullable=False)
+    filepath = db.Column(db.String(500), nullable=False)
+    file_type = db.Column(db.String(50), nullable=False)  # 'upload' or 'export'
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    
+    # Relationship for user who created the file
+    created_by = db.relationship('User', foreign_keys=[created_by_id], backref='uploaded_files')
+
+    def __repr__(self):
+        return f'<ProjectFile {self.filename} ({self.file_type})>'

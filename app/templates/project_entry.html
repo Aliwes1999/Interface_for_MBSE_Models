@@ -1,0 +1,59 @@
+{% extends "base.html" %} {% block title %}{{ project.name }} - Einstieg{%
+endblock %} {% block content %}
+<div class="container mt-5 pt-5">
+  <h1 class="mb-5 text-center">Projekt: {{ project.name }}</h1>
+
+  <div class="row">
+    <div class="col-md-6 mb-4">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body text-center">
+          <i class="bi bi-robot" style="font-size: 3rem; color: #0d6efd"></i>
+          <h5 class="card-title mt-3">Neue Anforderungen generieren</h5>
+          <p class="card-text text-muted">
+            Verwende KI um neue Anforderungen zu erstellen oder bestehende zu
+            analysieren.
+          </p>
+          <a
+            href="{{ url_for('agent.agent_page', project_id=project.id) }}"
+            class="btn btn-primary btn-lg w-100"
+          >
+            <i class="bi bi-play-fill"></i> Starten
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body text-center">
+          <i
+            class="bi bi-file-earmark-excel"
+            style="font-size: 3rem; color: #198754"
+          ></i>
+          <h5 class="card-title mt-3">Excel hochladen & optimieren</h5>
+          <p class="card-text text-muted">
+            Lade eine Excel-Datei hoch und lasse sie von der KI optimieren.
+          </p>
+          <a
+            href="{{ url_for('agent.upload_page', project_id=project.id) }}"
+            class="btn btn-success btn-lg w-100"
+          >
+            <i class="bi bi-upload"></i> Starten
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row mt-5">
+    <div class="col-12">
+      <a
+        href="{{ url_for('main.project_overview', project_id=project.id) }}?active_tab=files#files"
+        class="btn btn-outline-secondary"
+      >
+        <i class="bi bi-folder"></i> Archiv
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

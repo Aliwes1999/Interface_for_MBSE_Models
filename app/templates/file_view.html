@@ -1,0 +1,81 @@
+{% extends "base.html" %} {% block title %}Datei: {{ file.filename }}{% endblock
+%} {% block content %}
+<div class="container mt-5 pt-3">
+  <a
+    href="{{ url_for('main.project_overview', project_id=project.id) }}"
+    class="btn btn-secondary mb-3"
+    >&larr; Zurück zum Überblick</a
+  >
+
+  <div class="mb-3">
+    {% if file.file_type == 'upload' %}
+    <span class="badge bg-warning text-dark">Hochgeladene Datei</span>
+    {% elif file.file_type == 'generated' %}
+    <span class="badge bg-success">Erstellte Anforderungen</span>
+    {% elif file.file_type == 'export' %}
+    <span class="badge bg-info">Exportierte Datei</span>
+    {% else %}
+    <span class="badge bg-secondary">{{ file.file_type }}</span>
+    {% endif %}
+  </div>
+
+  <h2>{{ file.filename }}</h2>
+  <p>
+    <strong>Erstellt:</strong> {{ file.created_at.strftime('%d.%m.%Y %H:%M') }}
+    &nbsp; | &nbsp; <strong>Von:</strong> {% if file.created_by %}{{
+    file.created_by.email }}{% else %}-{% endif %}
+  </p>
+
+  {% if columns %}
+  <div class="card mb-3">
+    <div class="card-header">Erkannte Spalten</div>
+    <div class="card-body">
+      {% for col in columns %}
+      <span class="badge bg-primary me-1">{{ col }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %} {% if preview %}
+  <div class="card mb-3">
+    <div class="card-header">Vorschau (erste 10 Zeilen)</div>
+    <div class="card-body table-responsive">
+      <table class="table table-sm table-striped">
+        <thead>
+          <tr>
+            {% for col in columns %}
+            <th>{{ col }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in preview[:10] %}
+          <tr>
+            {% for col in columns %}
+            <td>{{ row.get(col, '') }}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="alert alert-info">Keine Vorschau verfügbar.</div>
+  {% endif %}
+
+  <div class="mb-3">
+    <a
+      href="{{ url_for('main.download_file', file_id=file.id) }}"
+      class="btn btn-outline-primary me-2"
+      ><i class="bi bi-download"></i> Herunterladen</a
+    >
+    {% if file.filename.endswith(('.xlsx', '.xls')) %}
+    <a
+      href="{{ url_for('agent.agent_page', project_id=project.id, preload_file=file.id) }}"
+      class="btn btn-success"
+      ><i class="bi bi-robot"></i> In KI laden</a
+    >
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

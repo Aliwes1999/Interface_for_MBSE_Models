@@ -3,8 +3,9 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 import os
 import json
+from datetime import datetime
 from . import db
-from .models import Requirement, RequirementVersion, Project
+from .models import Requirement, RequirementVersion, Project, ProjectFile
 from .services.ai_client import AIClient, generate_requirements
 from .services.exel_service import parse_excel_to_data
 
@@ -48,6 +49,18 @@ def agent_page(project_id):
     return render_template('agent/agent.html', project=project)
 
 
+@agent_bp.route('/upload/<int:project_id>')
+@login_required
+def upload_page(project_id):
+    """Render a dedicated upload page where users can upload an Excel file to be
+    analyzed/optimized by the AI."""
+    project = Project.query.get_or_404(project_id)
+    if project.user_id != current_user.id and current_user not in project.shared_with:
+        abort(403)
+
+    return render_template('agent/upload.html', project=project)
+
+
 @agent_bp.route('/generate/<int:project_id>', methods=['POST'])
 @login_required
 def generate_requirements_route(project_id):
@@ -72,40 +85,48 @@ def generate_requirements_route(project_id):
         
         # Check if Excel file was uploaded
         existing_requirements = None
-        temp_path = None
+        uploaded_file_path = None
+        uploaded_file_id = None
         if 'excel_file' in request.files:
             file = request.files['excel_file']
             if file and file.filename and file.filename.endswith(('.xlsx', '.xls')):
-                # Save file temporarily
+                # Secure filename and add timestamp to prevent overwrites
                 filename = secure_filename(file.filename)
-                temp_path = os.path.join('instance', 'temp', filename)
-                os.makedirs(os.path.dirname(temp_path), exist_ok=True)
-                file.save(temp_path)
-                
+                name, ext = os.path.splitext(filename)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                unique_filename = f"{name}_{timestamp}{ext}"
+
+                # Save file permanently in uploads folder
+                uploads_dir = os.path.join('uploads')
+                os.makedirs(uploads_dir, exist_ok=True)
+                uploaded_file_path = os.path.join(uploads_dir, unique_filename)
+                file.save(uploaded_file_path)
+
                 try:
                     # Parse Excel file
-                    excel_data = parse_excel_to_data(temp_path)
+                    excel_data = parse_excel_to_data(uploaded_file_path)
                     existing_requirements = excel_data
+
+                    # Create database entry for uploaded file
+                    project_file = ProjectFile(
+                        project_id=project_id,
+                        filename=filename,  # Original filename for display
+                        filepath=uploaded_file_path,
+                        file_type='upload',
+                        created_by_id=current_user.id
+                    )
+                    db.session.add(project_file)
+                    db.session.commit()
+                    uploaded_file_id = project_file.id
+
                 except Exception as e:
-                    # Clean up temp file on error
-                    if temp_path and os.path.exists(temp_path):
+                    # Clean up uploaded file on error
+                    if uploaded_file_path and os.path.exists(uploaded_file_path):
                         try:
-                            os.remove(temp_path)
+                            os.remove(uploaded_file_path)
                         except:
                             pass  # Ignore cleanup errors
                     raise e
-                finally:
-                    # Clean up temp file - use a delay to ensure file is closed
-                    if temp_path and os.path.exists(temp_path):
-                        import time
-                        import gc
-                        gc.collect()  # Force garbage collection to close file handles
-                        time.sleep(0.1)  # Small delay to ensure file is released
-                        try:
-                            os.remove(temp_path)
-                        except Exception as cleanup_error:
-                            # If we still can't delete, log it but don't fail the request
-                            print(f"Warning: Could not delete temp file {temp_path}: {cleanup_error}")
         
         # Get project's custom columns
         custom_columns = project.get_custom_columns()
@@ -183,11 +204,79 @@ def generate_requirements_route(project_id):
             saved_count += 1
         
         db.session.commit()
-        
+
+        # After saving generated requirements, also create an Excel snapshot
+        try:
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, Alignment
+
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Generated Requirements"
+
+            # use same columns list (title, description, custom..., category)
+            headers = [c.capitalize() for c in columns]
+            # write headers
+            for col_num, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col_num, value=header)
+                cell.font = Font(bold=True)
+                cell.alignment = Alignment(horizontal="center", vertical="top")
+
+            # write generated rows
+            row_num = 2
+            for req in generated_reqs:
+                row = []
+                for col in columns:
+                    row.append(req.get(col, ""))
+                for col_num, val in enumerate(row, 1):
+                    cell = ws.cell(row=row_num, column=col_num, value=val)
+                    cell.alignment = Alignment(wrap_text=True, vertical="top")
+                row_num += 1
+
+            # set some column widths
+            for i in range(1, len(headers) + 1):
+                col_letter = chr(ord('A') + i - 1)
+                ws.column_dimensions[col_letter].width = 20
+
+            # save workbook to uploads dir
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"generated_requirements_{project.name.replace(' ', '_')}_{timestamp}.xlsx"
+            uploads_dir = os.path.join('uploads')
+            os.makedirs(uploads_dir, exist_ok=True)
+            filepath = os.path.join(uploads_dir, filename)
+            wb.save(filepath)
+
+            # create ProjectFile entry
+            project_file = ProjectFile(
+                project_id=project_id,
+                filename=filename,
+                filepath=filepath,
+                file_type='generated',
+                created_by_id=current_user.id
+            )
+            db.session.add(project_file)
+            db.session.commit()
+            
+            # Get the file ID for redirect
+            generated_file_id = project_file.id
+        except Exception:
+            # non-fatal: ignore snapshot errors
+            generated_file_id = None
+            db.session.rollback()
+
+        # Redirect to the project overview and focus the requirements tab
+        # for the created/uploaded file so the user can edit the requirements.
+        if uploaded_file_id:
+            redirect_url = url_for('main.project_overview', project_id=project_id, file_id=uploaded_file_id)
+        elif generated_file_id:
+            redirect_url = url_for('main.project_overview', project_id=project_id, file_id=generated_file_id)
+        else:
+            redirect_url = url_for('main.project_overview', project_id=project_id)
+
         return jsonify({
             'ok': True,
             'count': saved_count,
-            'redirect': url_for('main.manage_project', project_id=project_id)
+            'redirect': redirect_url
         })
     
     except Exception as e:
