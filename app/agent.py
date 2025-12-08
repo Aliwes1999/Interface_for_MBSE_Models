@@ -72,6 +72,7 @@ def generate_requirements_route(project_id):
         
         # Check if Excel file was uploaded
         existing_requirements = None
+        temp_path = None
         if 'excel_file' in request.files:
             file = request.files['excel_file']
             if file and file.filename and file.filename.endswith(('.xlsx', '.xls')):
@@ -85,10 +86,26 @@ def generate_requirements_route(project_id):
                     # Parse Excel file
                     excel_data = parse_excel_to_data(temp_path)
                     existing_requirements = excel_data
+                except Exception as e:
+                    # Clean up temp file on error
+                    if temp_path and os.path.exists(temp_path):
+                        try:
+                            os.remove(temp_path)
+                        except:
+                            pass  # Ignore cleanup errors
+                    raise e
                 finally:
-                    # Clean up temp file
-                    if os.path.exists(temp_path):
-                        os.remove(temp_path)
+                    # Clean up temp file - use a delay to ensure file is closed
+                    if temp_path and os.path.exists(temp_path):
+                        import time
+                        import gc
+                        gc.collect()  # Force garbage collection to close file handles
+                        time.sleep(0.1)  # Small delay to ensure file is released
+                        try:
+                            os.remove(temp_path)
+                        except Exception as cleanup_error:
+                            # If we still can't delete, log it but don't fail the request
+                            print(f"Warning: Could not delete temp file {temp_path}: {cleanup_error}")
         
         # Get project's custom columns
         custom_columns = project.get_custom_columns()
