@@ -49,6 +49,26 @@ endblock %} {% block content %}
         </div>
 
         <div class="mb-3">
+          <label class="form-label">Anzahl der Anforderungen</label>
+          <div class="row g-2 align-items-center">
+            <div class="col-auto">
+              <select class="form-select" id="amount_mode" name="amount_mode">
+                <option value="none" selected>none (automatisch)</option>
+                <option value="exact">exact (GENAU)</option>
+                <option value="min">min (MINDESTENS)</option>
+                <option value="max">max (HÖCHSTENS)</option>
+              </select>
+            </div>
+            <div class="col-auto">
+              <input type="number" min="1" class="form-control" id="amount_value" name="amount_value" placeholder="Wert" value="5" />
+            </div>
+            <div class="col-auto">
+              <small class="text-muted">Regeln werden exakt im Prompt angewendet (siehe Vorgaben).</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-3">
           <label class="form-label">Zusätzliche Spalten</label>
           <div id="custom-columns-container">
             <!-- Default columns that are always included -->
@@ -198,6 +218,36 @@ endblock %} {% block content %}
       }
       if (userDescription && userDescription.trim()) {
         combinedDescription += `Beschreibung: ${userDescription.trim()}\n`;
+      }
+
+      // Read amount mode and value and append strict rules to the prompt.
+      const amountMode = (formData.get("amount_mode") || "none").toString();
+      let amountValueRaw = formData.get("amount_value");
+      let amountValue = parseInt(amountValueRaw, 10);
+      if (isNaN(amountValue) || amountValue < 1) {
+        amountValue = 5; // default
+      }
+
+      // Compute a small buffer for the 'min' rule. Use 20% rounded down, at least 1.
+      const buffer = Math.max(1, Math.floor(amountValue * 0.2));
+      const amount_value_plus_buffer = amountValue + buffer;
+
+      // Build exact instructions according to the 4 rules and append them
+      // EXACTLY as specified by the user (German text kept concise).
+      let amountInstruction = "";
+      if (amountMode === "exact") {
+        amountInstruction = `Erzeuge GENAU ${amountValue} Requirements.`;
+      } else if (amountMode === "min") {
+        amountInstruction = `Erzeuge mindestens ${amountValue} Requirements. Erzeuge nach Möglichkeit zwischen ${amountValue} und ${amount_value_plus_buffer} Requirements.`;
+      } else if (amountMode === "max") {
+        amountInstruction = `Erzeuge höchstens ${amountValue} Requirements. Erzeuge eine sinnvolle Anzahl <= ${amountValue}.`;
+      } else {
+        amountInstruction = `Wähle selbst eine sinnvolle Anzahl an Requirements (typischerweise zwischen 5 und 20).`;
+      }
+
+      // Append the instruction to the combined description so the model follows the rules.
+      if (amountInstruction) {
+        combinedDescription += `\nAnzahl-Regel: ${amountInstruction}\n`;
       }
 
       const payload = new FormData();
