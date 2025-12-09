@@ -129,36 +129,53 @@ Gib 3-5 konkrete Verbesserungsvorschläge als Liste zurück."""
         except Exception as e:
             return [f"Verbesserungsvorschläge konnten nicht generiert werden: {str(e)}"]
 
-def generate_new_requirements(user_description: str | None, inputs: dict, columns: list = None) -> list[dict]:
+def generate_new_requirements(user_description: str | None, inputs: dict, columns: list = None, model: str = None) -> list[dict]:
     """
     Generate COMPLETELY NEW requirements from scratch using AI.
     Used for: "Neue Anforderungen generieren" button
+    
+    THIS FUNCTION IS COMPLETELY INDEPENDENT FROM optimize_excel_requirements()
+    - Has its own dedicated AI prompt for generating NEW requirements
+    - Does NOT use existing requirements as input
+    - Creates requirements from user description only
 
     Args:
         user_description (str | None): Optional user description of requirements.
         inputs (dict): Key-value pairs for additional context.
         columns (list): Optional list of column names for the project.
+        model (str): Optional AI model to use (e.g., 'gpt-4o', 'gpt-4o-mini').
 
     Returns:
         list[dict]: List of requirement dicts with dynamic columns based on project.
     """
     api_key = config.OPENAI_API_KEY
-    model = config.OPENAI_MODEL or "gpt-4o-mini"
+    model = model or config.OPENAI_MODEL or "gpt-4o-mini"
 
     if not api_key:
         raise ValueError("OPENAI_API_KEY environment variable must be set.")
 
-    # System prompt for NEW generation
-    system_prompt = """Du bist ein erfahrener Requirements Engineer. Arbeite nach dem 4-Phasen-Modell:
+    # ===== PROMPT 1: NEU-GENERIERUNG =====
+    # Dieser Prompt ist NUR für die Erstellung NEUER Anforderungen
+    # NICHT für die Optimierung bestehender Excel-Anforderungen
+    system_prompt = """Du bist ein erfahrener Requirements Engineer. 
+Deine Aufgabe: NEUE Anforderungen VON GRUND AUF erstellen.
 
-PHASE 1 & 2 (Analyse/Struktur): Verstehe den Kontext und strukturiere die Anforderungen logisch.
+PHASE 1 & 2 (Analyse/Struktur): 
+- Verstehe die Beschreibung des Users
+- Identifiziere die benötigten Anforderungs-Kategorien
+- Strukturiere die Anforderungen logisch
 
-PHASE 3 (Erstellung): Formuliere NEUE Anforderungen nach der Satzschablone "Das System muss...". 
-Stelle sicher, dass sie SMART, normenkonform und präzise sind.
+PHASE 3 (Neu-Erstellung): 
+- Formuliere KOMPLETT NEUE Anforderungen
+- Nutze die Satzschablone "Das System muss..."
+- Stelle sicher: SMART, normenkonform, präzise
+- MINDESTENS 5 unterschiedliche Anforderungen
 
-PHASE 4 (Review): Qualitätscheck - jede Anforderung muss messbar, akzeptabel und testbar sein.
+PHASE 4 (Review): 
+- Qualitätscheck für jede Anforderung
+- Messbar, akzeptabel, testbar
 
-WICHTIG: Antworte nur mit den generierten Anforderungen im geforderten JSON-Format. Kein zusätzlicher Text."""
+WICHTIG: Antworte NUR mit JSON. Kein zusätzlicher Text."""
 
     client = OpenAI(api_key=api_key)
 
@@ -232,41 +249,55 @@ WICHTIG:
         raise RuntimeError(f"OpenAI request failed: {str(e)}")
 
 
-def optimize_excel_requirements(existing_requirements: list[dict], columns: list, user_description: str | None = None) -> list[dict]:
+def optimize_excel_requirements(existing_requirements: list[dict], columns: list, user_description: str | None = None, model: str = None) -> list[dict]:
     """
     Optimize and improve EXISTING requirements from Excel file using AI.
     Used for: Excel file upload with AI optimization
+    
+    THIS FUNCTION IS COMPLETELY INDEPENDENT FROM generate_new_requirements()
+    - Has its own dedicated AI prompt for OPTIMIZING existing requirements
+    - Uses Excel data as input to improve/refine
+    - Does NOT generate new requirements from scratch
 
     Args:
         existing_requirements (list[dict]): Existing requirements from Excel
         columns (list): Column names from the Excel file
         user_description (str | None): Optional additional context
+        model (str): Optional AI model to use (e.g., 'gpt-4o', 'gpt-4o-mini').
 
     Returns:
         list[dict]: Optimized requirements maintaining Excel structure
     """
     api_key = config.OPENAI_API_KEY
-    model = config.OPENAI_MODEL or "gpt-4o-mini"
+    model = model or config.OPENAI_MODEL or "gpt-4o-mini"
 
     if not api_key:
         raise ValueError("OPENAI_API_KEY environment variable must be set.")
 
-    # System prompt for OPTIMIZATION
-    system_prompt = """Du bist ein erfahrener Requirements Engineer. Arbeite nach dem 4-Phasen-Modell:
+    # ===== PROMPT 2: EXCEL-OPTIMIERUNG =====
+    # Dieser Prompt ist NUR für die Optimierung bestehender Excel-Anforderungen
+    # NICHT für die Erstellung neuer Anforderungen
+    system_prompt = """Du bist ein erfahrener Requirements Engineer.
+Deine Aufgabe: BESTEHENDE Excel-Anforderungen OPTIMIEREN und VERBESSERN.
 
-PHASE 1 & 2 (Analyse/Struktur): Analysiere die übergebenen bestehenden Anforderungen aus der Excel-Datei. 
-Verstehe den Kontext und die vorhandene Struktur.
+PHASE 1 & 2 (Analyse/Struktur): 
+- Analysiere die übergebenen Anforderungen aus der Excel-Datei
+- Verstehe Kontext und vorhandene Struktur
+- Identifiziere Verbesserungspotenzial
 
-PHASE 3 (Optimierung): Verbessere jede einzelne Anforderung inhaltlich:
-- Präzisiere die Formulierung
+PHASE 3 (Optimierung): 
+- Verbessere JEDE einzelne Anforderung inhaltlich
+- Präzisiere Formulierungen
 - Stelle SMART-Kriterien sicher
 - Verbessere Normenkonformität
-- BEHALTE die Anzahl der Anforderungen GLEICH (keine neuen hinzufügen!)
-- BEHALTE die Spaltenstruktur EXAKT bei
+- WICHTIG: GLEICHE ANZAHL beibehalten (keine neuen hinzufügen!)
+- WICHTIG: Spaltenstruktur EXAKT beibehalten
 
-PHASE 4 (Review): Qualitätscheck - jede Anforderung muss präzise, messbar und normenkonform sein.
+PHASE 4 (Review): 
+- Qualitätscheck für jede optimierte Anforderung
+- Präzise, messbar, normenkonform
 
-WICHTIG: Antworte nur mit den OPTIMIERTEN Anforderungen im gleichen JSON-Format. Kein zusätzlicher Text."""
+WICHTIG: Antworte NUR mit den OPTIMIERTEN Anforderungen im gleichen JSON-Format. Kein zusätzlicher Text."""
 
     client = OpenAI(api_key=api_key)
 

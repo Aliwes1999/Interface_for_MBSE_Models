@@ -51,20 +51,40 @@ endblock %} {% block content %}
         <div class="mb-3">
           <label class="form-label">Zusätzliche Spalten</label>
           <div id="custom-columns-container">
-            <!-- Existing columns from project -->
-            {% for column in project.get_custom_columns() %}
+            <!-- Default columns that are always included -->
             <div class="input-group mb-2">
               <input
                 type="text"
-                class="form-control"
-                value="{{ column }}"
+                class="form-control column-input"
+                value="title"
                 readonly
               />
-              <span class="input-group-text bg-secondary text-white"
-                >Bestehend</span
+              <span class="input-group-text bg-primary text-white"
+                >Standard</span
               >
             </div>
-            {% endfor %}
+            <div class="input-group mb-2">
+              <input
+                type="text"
+                class="form-control column-input"
+                value="description"
+                readonly
+              />
+              <span class="input-group-text bg-primary text-white"
+                >Standard</span
+              >
+            </div>
+            <div class="input-group mb-2">
+              <input
+                type="text"
+                class="form-control column-input"
+                value="category"
+                readonly
+              />
+              <span class="input-group-text bg-primary text-white"
+                >Standard</span
+              >
+            </div>
           </div>
           <button
             type="button"
@@ -75,8 +95,33 @@ endblock %} {% block content %}
           </button>
           <small class="form-text text-muted d-block mt-2"
             >Füge zusätzliche Spalten hinzu, die die KI ausfüllen soll (z.B.
-            "Priorität", "Kosten", "Verantwortlich").</small
+            "Priorität", "Kosten", "Verantwortlich", "Farbe").</small
           >
+        </div>
+
+        <div class="mb-3">
+          <label for="ai_model" class="form-label">
+            <i class="bi bi-cpu"></i> KI-Modell wählen
+          </label>
+          <select class="form-select" id="ai_model" name="ai_model">
+            {% for model in available_models %}
+            <option
+              value="{{ model.id }}"
+              {%
+              if
+              loop.first
+              %}selected{%
+              endif
+              %}
+            >
+              {{ model.name }} - {{ model.description }}
+            </option>
+            {% endfor %}
+          </select>
+          <div class="form-text">
+            Wähle das KI-Modell für die Generierung. Leistungsstärkere Modelle
+            bieten bessere Qualität, sind aber teurer.
+          </div>
         </div>
 
         <button type="submit" class="btn btn-primary" id="generate-btn">
@@ -106,7 +151,7 @@ endblock %} {% block content %}
       newColumn.className = "input-group mb-2";
       newColumn.id = `column-${columnCounter}`;
       newColumn.innerHTML = `
-      <input type="text" class="form-control new-column" placeholder="Spaltenname eingeben..." />
+      <input type="text" class="form-control column-input" placeholder="Spaltenname eingeben..." />
       <button class="btn btn-outline-danger" type="button" onclick="this.parentElement.remove()">
         <i class="bi bi-trash"></i>
       </button>
@@ -133,14 +178,14 @@ endblock %} {% block content %}
       const formData = new FormData(e.target);
       const maschine = formData.get("maschine") || "";
       const userDescription = formData.get("user_description") || "";
-      const fileInput = document.getElementById("excel_file");
+      const aiModel = formData.get("ai_model") || "";
 
-      // Collect new columns
-      const newColumns = [];
-      document.querySelectorAll(".new-column").forEach((input) => {
+      // Collect ALL columns (standard + custom)
+      const allColumns = [];
+      document.querySelectorAll(".column-input").forEach((input) => {
         const value = input.value.trim();
         if (value) {
-          newColumns.push(value);
+          allColumns.push(value);
         }
       });
 
@@ -156,15 +201,16 @@ endblock %} {% block content %}
       }
 
       const payload = new FormData();
-      if (fileInput.files[0]) {
-        payload.append("excel_file", fileInput.files[0]);
-      }
       payload.append("user_description", combinedDescription);
       // Send empty inputs object to maintain backend compatibility
       payload.append("inputs", JSON.stringify([]));
-      // Send new columns to backend
-      if (newColumns.length > 0) {
-        payload.append("new_columns", JSON.stringify(newColumns));
+      // Send ALL columns to backend (standard + custom)
+      if (allColumns.length > 0) {
+        payload.append("new_columns", JSON.stringify(allColumns));
+      }
+      // Send selected AI model
+      if (aiModel) {
+        payload.append("ai_model", aiModel);
       }
 
       // Send POST request
