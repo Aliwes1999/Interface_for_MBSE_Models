@@ -214,60 +214,6 @@ content %} {% if not project %}
             </table>
           </div>
         </div>
-
-        <div class="mb-3">
-          <h5>Manuell exportierte Dateien</h5>
-          <div class="table-responsive">
-            <table class="table table-hover">
-              <thead class="table-light">
-                <tr>
-                  <th>Dateiname</th>
-                  <th>Datum</th>
-                  <th>Erstellt von</th>
-                  <th>Aktionen</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% set exports =
-                project.files|selectattr('file_type','equalto','export')|list %}
-                {% for file in exports %}
-                <tr>
-                  <td>
-                    <i class="bi bi-file-earmark-spreadsheet text-info me-2"></i>
-                    <a
-                      href="{{ url_for('main.project_overview', project_id=project.id, file_id=file.id) }}"
-                      >{{ file.filename }}</a
-                    >
-                  </td>
-                  <td>{{ file.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
-                  <td>
-                    {% if file.created_by %}{{
-                    file.created_by.email.split('@')[0] }}{% else %}-{% endif %}
-                  </td>
-                  <td>
-                    <a
-                      href="{{ url_for('main.download_file', file_id=file.id) }}"
-                      class="btn btn-sm btn-outline-primary me-2"
-                      ><i class="bi bi-download"></i> Download</a
-                    >
-                    <form method="POST" action="{{ url_for('main.delete_project_file', file_id=file.id) }}" class="d-inline" onsubmit="return confirm('Datei wirklich löschen?');">
-                      <button type="submit" class="btn btn-sm btn-outline-danger">
-                        <i class="bi bi-trash"></i> Löschen
-                      </button>
-                    </form>
-                  </td>
-                </tr>
-                {% endfor %} {% if exports|length == 0 %}
-                <tr>
-                  <td colspan="4" class="text-center text-muted">
-                    Keine manuell exportierten Dateien vorhanden.
-                  </td>
-                </tr>
-                {% endif %}
-              </tbody>
-            </table>
-          </div>
-        </div>
       </div>
     </div>
   {% else %}
@@ -303,10 +249,10 @@ content %} {% if not project %}
           <button
             class="btn btn-sm btn-info me-2"
             type="button"
-            data-bs-toggle="modal"
-            data-bs-target="#importExcelModal"
+            id="toggle-quantifizierbar"
+            onclick="toggleQuantifizierbareColumn()"
           >
-            <i class="bi bi-file-earmark-arrow-up"></i> Import aus Excel
+            <i class="bi bi-eye" id="quantifizierbar-icon"></i> Quantifizierbar
           </button>
           <button
             class="btn btn-sm btn-primary"
@@ -450,11 +396,17 @@ content %} {% if not project %}
           <table class="table table-hover align-middle">
             <thead class="table-light">
               <tr>
-                <th style="width: 5%">Version</th>
                 <th style="width: 5%">ID</th>
+                <th style="width: 15%">title</th>
+                <th style="width: 15%">description</th>
+                <th class="quantifizierbar-column" style="width: 8%;">Quantifizierbar</th>
+                <th style="width: 8%">category</th>
                 {% for column in custom_columns %}
-                <th style="width: {% if loop.first or loop.index == 2 %}15{% else %}8{% endif %}%">{{ column }}</th>
+                {% if column not in ['title', 'description', 'category'] %}
+                <th style="width: 8%">{{ column }}</th>
+                {% endif %}
                 {% endfor %}
+                <th style="width: 5%">Version</th>
                 <th style="width: 8%">Status</th>
                 <th style="width: 10%">Benutzer</th>
                 <th style="width: 20%">Aktionen</th>
@@ -464,6 +416,45 @@ content %} {% if not project %}
               {% if req_with_versions %} {% for req, versions in
               req_with_versions %}
               <tr id="req-row-{{ req.id }}" data-req-id="{{ req.id }}">
+                <td>{{ loop.index }}</td>
+                <td class="custom-data-cell" data-column="title">
+                  {{ versions[-1].get_custom_data().get('title', '–') }}
+                </td>
+                <td class="custom-data-cell" data-column="description">
+                  {{ versions[-1].get_custom_data().get('description', '\u2013') }}
+                </td>
+                <td class="quantifizierbar-column">
+                  <div class="btn-group btn-group-sm" role="group">
+                    <button 
+                      type="button" 
+                      class="btn quantifizierbar-btn {% if versions[-1].get_custom_data().get('quantifizierbar') == 'ja' %}btn-success active{% else %}btn-outline-success{% endif %}"
+                      onclick="setQuantifizierbar({{ req.id }}, {{ versions[-1].id }}, 'ja')"
+                      data-req-id="{{ req.id }}"
+                      data-value="ja"
+                    >
+                      <i class="bi bi-check-lg"></i>
+                    </button>
+                    <button 
+                      type="button" 
+                      class="btn quantifizierbar-btn {% if versions[-1].get_custom_data().get('quantifizierbar') == 'nein' %}btn-danger active{% else %}btn-outline-danger{% endif %}"
+                      onclick="setQuantifizierbar({{ req.id }}, {{ versions[-1].id }}, 'nein')"
+                      data-req-id="{{ req.id }}"
+                      data-value="nein"
+                    >
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                  </div>
+                </td>
+                <td class="custom-data-cell" data-column="category">
+                  {{ versions[-1].get_custom_data().get('category', '–') }}
+                </td>
+                {% for column in custom_columns %}
+                {% if column not in ['title', 'description', 'category'] %}
+                <td class="custom-data-cell" data-column="{{ column }}">
+                  {{ versions[-1].get_custom_data().get(column, "–") }}
+                </td>
+                {% endif %}
+                {% endfor %}
                 <td>
                   <select
                     class="form-select form-select-sm version-selector"
@@ -484,12 +475,6 @@ content %} {% if not project %}
                     {% endfor %}
                   </select>
                 </td>
-                <td>{{ loop.index }}</td>
-                {% for column in custom_columns %}
-                <td class="custom-data-cell" data-column="{{ column }}">
-                  {{ versions[-1].get_custom_data().get(column, "–") }}
-                </td>
-                {% endfor %}
                 <td class="status-cell">
                   <span class="badge" style="background-color: {{ versions[-1].get_status_color() }}">
                     {{ versions[-1].status }}
@@ -779,6 +764,72 @@ content %} {% if not project %}
     </div>
   </div>
 </div>
+
+<script>
+// Toggle Quantifizierbar column visibility
+function toggleQuantifizierbareColumn() {
+  const columns = document.querySelectorAll('.quantifizierbar-column');
+  const icon = document.getElementById('quantifizierbar-icon');
+  
+  // Check current state - if display is 'none' or empty string means visible
+  const isVisible = columns[0].style.display !== 'none';
+  
+  columns.forEach(col => {
+    col.style.display = isVisible ? 'none' : '';
+  });
+  
+  // Update icon
+  if (isVisible) {
+    // Now hidden
+    icon.classList.remove('bi-eye');
+    icon.classList.add('bi-eye-slash');
+  } else {
+    // Now visible
+    icon.classList.remove('bi-eye-slash');
+    icon.classList.add('bi-eye');
+  }
+}
+
+// Set quantifizierbar value
+function setQuantifizierbar(reqId, versionId, value) {
+  // Send AJAX request to update custom_data
+  fetch(`/requirement/version/${versionId}/update_quantifizierbar`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ quantifizierbar: value })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.ok) {
+      // Update button states
+      const row = document.querySelector(`tr[data-req-id="${reqId}"]`);
+      const buttons = row.querySelectorAll('.quantifizierbar-btn');
+      
+      buttons.forEach(btn => {
+        btn.classList.remove('btn-success', 'btn-danger', 'active');
+        
+        if (btn.dataset.value === value) {
+          btn.classList.add('active');
+          if (value === 'ja') {
+            btn.classList.add('btn-success');
+          } else {
+            btn.classList.add('btn-danger');
+          }
+        } else {
+          if (btn.dataset.value === 'ja') {
+            btn.classList.add('btn-outline-success');
+          } else {
+            btn.classList.add('btn-outline-danger');
+          }
+        }
+      });
+    }
+  })
+  .catch(error => console.error('Error:', error));
+}
+</script>
 
 <script src="{{ url_for('static', filename='project.js') }}"></script>
 

@@ -55,6 +55,31 @@ project.name }}{% endblock %} {% block content %}
           ></textarea>
         </div>
 
+        <div class="mb-3">
+          <label for="ai_model" class="form-label">
+            <i class="bi bi-cpu"></i> KI-Modell wählen
+          </label>
+          <select class="form-select" id="ai_model" name="ai_model">
+            {% for model in available_models %}
+            <option
+              value="{{ model.id }}"
+              {%
+              if
+              loop.first
+              %}selected{%
+              endif
+              %}
+            >
+              {{ model.name }} - {{ model.description }}
+            </option>
+            {% endfor %}
+          </select>
+          <div class="form-text">
+            Wähle das KI-Modell für die Optimierung. Leistungsstärkere Modelle
+            bieten bessere Qualität, sind aber teurer.
+          </div>
+        </div>
+
         <button type="submit" class="btn btn-primary">
           Hochladen und optimieren
         </button>

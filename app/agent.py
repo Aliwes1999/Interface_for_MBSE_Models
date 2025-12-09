@@ -46,7 +46,11 @@ def agent_page(project_id):
     if project.user_id != current_user.id:
         abort(403)
     
-    return render_template('agent/agent.html', project=project)
+    # Import available models from config
+    import config
+    available_models = config.AVAILABLE_AI_MODELS
+    
+    return render_template('agent/agent.html', project=project, available_models=available_models)
 
 
 @agent_bp.route('/upload/<int:project_id>')
@@ -57,8 +61,12 @@ def upload_page(project_id):
     project = Project.query.get_or_404(project_id)
     if project.user_id != current_user.id and current_user not in project.shared_with:
         abort(403)
+    
+    # Import available models from config
+    import config
+    available_models = config.AVAILABLE_AI_MODELS
 
-    return render_template('agent/upload.html', project=project)
+    return render_template('agent/upload.html', project=project, available_models=available_models)
 
 
 @agent_bp.route('/upload_excel/<int:project_id>', methods=['POST'])
@@ -115,19 +123,12 @@ def upload_excel_route(project_id):
                     'error': 'Keine Daten in der Excel-Datei gefunden.'
                 }), 400
 
-            # Extract and merge column names
+            # Extract column names from Excel (do NOT save to project)
             excel_columns = list(cleaned_excel_data[0].keys())
             filtered_columns = [col for col in excel_columns if col and col.strip()]
             
-            if filtered_columns:
-                existing_columns = project.get_custom_columns() or []
-                merged_columns = existing_columns.copy()
-                for col in filtered_columns:
-                    if col not in merged_columns:
-                        merged_columns.append(col)
-                
-                project.set_custom_columns(merged_columns)
-                db.session.commit()
+            # Use Excel columns directly for AI optimization
+            # Do NOT merge with project columns - keep Excel upload independent
 
             # Create ProjectFile entry
             project_file = ProjectFile(
@@ -143,13 +144,21 @@ def upload_excel_route(project_id):
 
             # Get optional user description from form
             user_description = request.form.get('user_description', '').strip()
+            
+            # Get selected AI model from form
+            selected_model = request.form.get('ai_model', '').strip()
+            if not selected_model:
+                # Fallback to default model from config
+                import config
+                selected_model = config.OPENAI_MODEL or 'gpt-4o-mini'
 
             # Optimize requirements using AI while maintaining structure
             try:
                 optimized_reqs = optimize_excel_requirements(
                     existing_requirements=cleaned_excel_data,
                     columns=filtered_columns if filtered_columns else ["title", "description", "category"],
-                    user_description=user_description if user_description else None
+                    user_description=user_description if user_description else None,
+                    model=selected_model
                 )
             except Exception as e:
                 return jsonify({
@@ -312,36 +321,34 @@ def generate_requirements_route(project_id):
         except:
             inputs = {}
         
-        # Parse new columns
+        # Parse new columns from form (do NOT use project.custom_columns)
         try:
             new_columns = json.loads(new_columns_json)
-            if new_columns and isinstance(new_columns, list):
-                # Merge new columns with existing project columns
-                existing_columns = project.get_custom_columns() or []
-                merged_columns = existing_columns.copy()
-                for col in new_columns:
-                    if col and col.strip() and col not in merged_columns:
-                        merged_columns.append(col)
-                
-                # Update project columns
-                if len(merged_columns) > len(existing_columns):
-                    project.set_custom_columns(merged_columns)
-                    db.session.commit()
+            # Use ONLY the columns specified in this form - completely independent
+            columns = [col.strip() for col in new_columns if col and col.strip()] if new_columns else []
         except Exception as e:
-            pass  # Silently ignore column parsing errors
+            columns = []
         
         # This endpoint is ONLY for AI generation (no Excel upload)
         # For Excel upload, use /upload_excel endpoint instead
         
-        # Get project's custom columns
-        custom_columns = project.get_custom_columns()
-        columns = custom_columns if custom_columns else ["title", "description", "category"]
+        # If no columns specified, use default columns
+        if not columns:
+            columns = ["title", "description", "category"]
+        
+        # Get selected AI model from form
+        selected_model = request.form.get('ai_model', '').strip()
+        if not selected_model:
+            # Fallback to default model from config
+            import config
+            selected_model = config.OPENAI_MODEL or 'gpt-4o-mini'
         
         # Generate requirements using AI (always use AI, no direct import)
         generated_reqs = generate_new_requirements(
             user_description=user_description if user_description else None,
             inputs=inputs,
-            columns=columns
+            columns=columns,
+            model=selected_model
         )
         
         if not generated_reqs:

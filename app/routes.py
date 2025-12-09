@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from sqlalchemy import func, and_
 import json
 import os
+from datetime import datetime
 from . import db
 from .models import Project, Requirement, RequirementVersion, ProjectFile
 from .services.ai_client import generate_requirements
@@ -95,8 +96,17 @@ def project_overview(project_id):
                         generated_req_count += 1
                         break
     
-    # Get custom columns for this project
-    custom_columns = project.get_custom_columns()
+    # Extract ALL custom columns dynamically from requirement versions
+    # This ensures we show all columns that exist in any requirement
+    all_custom_columns = set()
+    for req, versions in req_with_versions:
+        for version in versions:
+            custom_data = version.get_custom_data()
+            if custom_data:
+                all_custom_columns.update(custom_data.keys())
+    
+    # Convert to sorted list for consistent display
+    custom_columns = sorted(list(all_custom_columns))
     
     # Get latest snapshot/export/generated file for quick access
     latest_snapshot = ProjectFile.query.filter_by(project_id=project_id).filter(
@@ -637,16 +647,27 @@ def export_excel(project_id):
         is_deleted=False
     ).all()
     
-    # Get custom columns
-    custom_columns = project.get_custom_columns()
+    # Extract custom columns dynamically from all requirements
+    all_custom_columns = set()
+    for req in requirements:
+        latest_version = req.get_latest_version()
+        if latest_version:
+            custom_data = latest_version.get_custom_data()
+            if custom_data:
+                all_custom_columns.update(custom_data.keys())
+    
+    # Convert to sorted list for consistent display
+    custom_columns = sorted(list(all_custom_columns))
     
     # Create workbook
     wb = Workbook()
     ws = wb.active
     ws.title = "Requirements"
     
-    # Define headers
-    headers = ["Version", "ID", "Title", "Beschreibung"] + custom_columns + ["Kategorie", "Status"]
+    # Define headers: ID, title, description, category, dann custom columns (ohne diese 3), dann Version, Status
+    # Filter custom_columns to exclude title, description, category
+    filtered_custom_columns = [col for col in custom_columns if col not in ['title', 'description', 'category']]
+    headers = ["ID", "title", "description", "category"] + filtered_custom_columns + ["Version", "Status"]
     
     # Write headers
     for col_num, header in enumerate(headers, 1):
@@ -670,20 +691,20 @@ def export_excel(project_id):
         
         custom_data = latest_version.get_custom_data()
         
-        # Prepare row data
+        # Prepare row data: ID, title, description, category (from custom_data), custom columns, Version, Status
         row_data = [
-            latest_version.version_label,
             display_id,
-            latest_version.title,
-            latest_version.description
+            custom_data.get('title', '–'),
+            custom_data.get('description', '–'),
+            custom_data.get('category', '–')
         ]
         
-        # Add custom column values
-        for col in custom_columns:
+        # Add other custom column values (excluding title, description, category)
+        for col in filtered_custom_columns:
             row_data.append(custom_data.get(col, "–"))
         
-        # Add category and status
-        row_data.append(latest_version.category or "–")
+        # Add version and status at the end
+        row_data.append(latest_version.version_label)
         row_data.append(latest_version.status)
         
         # Write row
@@ -695,29 +716,30 @@ def export_excel(project_id):
         display_id += 1
     
     # Set column widths
-    ws.column_dimensions['A'].width = 10  # Version
-    ws.column_dimensions['B'].width = 8   # ID
-    ws.column_dimensions['C'].width = 30  # Title
-    ws.column_dimensions['D'].width = 50  # Description
+    ws.column_dimensions['A'].width = 8   # ID
+    ws.column_dimensions['B'].width = 30  # title
+    ws.column_dimensions['C'].width = 50  # description
+    ws.column_dimensions['D'].width = 20  # category
     
-    # Set widths for custom columns
+    # Set widths for custom columns (start at column E)
     col_letter_start = ord('E')
-    for i, col in enumerate(custom_columns):
+    for i, col in enumerate(filtered_custom_columns):
         col_letter = chr(col_letter_start + i)
         ws.column_dimensions[col_letter].width = 20
     
-    # Set widths for category and status
-    col_letter = chr(col_letter_start + len(custom_columns))
-    ws.column_dimensions[col_letter].width = 20  # Category
-    col_letter = chr(col_letter_start + len(custom_columns) + 1)
+    # Set width for version and status (after custom columns)
+    col_letter = chr(col_letter_start + len(filtered_custom_columns))
+    ws.column_dimensions[col_letter].width = 10  # Version
+    col_letter = chr(col_letter_start + len(filtered_custom_columns) + 1)
     ws.column_dimensions[col_letter].width = 15  # Status
     
     # Generate filename with timestamp
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     filename = f"requirements_{project.name.replace(' ', '_')}_{timestamp}.xlsx"
 
-    # Save file to uploads directory
-    uploads_dir = os.path.join('uploads')
+    # Save file to uploads directory (use absolute path)
+    from flask import current_app
+    uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads')
     os.makedirs(uploads_dir, exist_ok=True)
     filepath = os.path.join(uploads_dir, filename)
     wb.save(filepath)
@@ -967,6 +989,33 @@ def toggle_block_requirement(version_id):
     
     db.session.commit()
     return redirect(request.referrer or url_for('main.manage_project', project_id=project.id))
+
+@bp.route("/requirement/version/<int:version_id>/update_quantifizierbar", methods=['POST'])
+@login_required
+def update_quantifizierbar(version_id):
+    """Update quantifizierbar value for a requirement version"""
+    version = RequirementVersion.query.get_or_404(version_id)
+    project = version.requirement.project
+    
+    # Authorization check
+    if project.user_id != current_user.id and current_user not in project.shared_with:
+        abort(403)
+    
+    # Get value from request
+    data = request.get_json()
+    quantifizierbar_value = data.get('quantifizierbar')
+    
+    if quantifizierbar_value not in ['ja', 'nein']:
+        return jsonify({'ok': False, 'error': 'Invalid value'}), 400
+    
+    # Update custom_data
+    custom_data = version.get_custom_data() or {}
+    custom_data['quantifizierbar'] = quantifizierbar_value
+    version.set_custom_data(custom_data)
+    
+    db.session.commit()
+    
+    return jsonify({'ok': True, 'value': quantifizierbar_value})
 
 @bp.route("/hello")
 def hello():

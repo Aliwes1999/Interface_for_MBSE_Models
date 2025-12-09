@@ -6,6 +6,14 @@ OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
 SYSTEM_PROMPT_PATH = os.getenv('SYSTEM_PROMPT_PATH')
 SYSTEM_PROMPT = os.getenv('SYSTEM_PROMPT')
 
+# Available AI Models for selection
+AVAILABLE_AI_MODELS = [
+    {"id": "gpt-4o-mini", "name": "GPT-4o Mini (Schnell & Günstig)", "description": "Empfohlen für die meisten Aufgaben"},
+    {"id": "gpt-4o", "name": "GPT-4o (Leistungsstark)", "description": "Bessere Qualität, höhere Kosten"},
+    {"id": "gpt-4-turbo", "name": "GPT-4 Turbo", "description": "Sehr hohe Qualität"},
+    {"id": "gpt-3.5-turbo", "name": "GPT-3.5 Turbo (Schnell)", "description": "Schnell und kostengünstig"},
+]
+
 # Default System Prompt if none provided
 DEFAULT_SYSTEM_PROMPT = """
 Du bist ein erfahrener Requirements Engineer.
