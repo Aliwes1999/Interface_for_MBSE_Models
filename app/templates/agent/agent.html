@@ -34,22 +34,23 @@ endblock %} {% block content %}
         </div>
 
 
-    <div class="mb-3">
-      <label for="system_description" class="form-label">Systembeschreibung (optional)</label>
-      <textarea
-        class="form-control"
-        id="system_description"
-        name="system_description"
-        rows="5"
-        placeholder="Beschreibe das Produktsystem, seine Funktionen oder seinen Einsatzbereich."
-      ></textarea>
-      <small class="form-text text-muted">
-        Gib eine allgemeine Beschreibung des Produktsystems an. Diese Informationen helfen der KI,
-        präzisere und besser zugeschnittene Anforderungen zu generieren. Wenn du keine
-        Beschreibung angibst, werden allgemeine Requirements erstellt.
-      </small>
-    </div>
-
+        <div class="mb-3">
+          <label for="user_description" class="form-label"
+            >User-Beschreibung (optional)</label
+          >
+          <textarea
+            class="form-control"
+            id="user_description"
+            name="user_description"
+            rows="5"
+            placeholder="Beschreibe die Requirements, die du generieren möchtest. Dieses Feld ist optional."
+          ></textarea>
+          <small class="form-text text-muted"
+            >Gib eine allgemeine Beschreibung der gewünschten Requirements ein.
+            Wenn du keine Beschreibung angibst, werden allgemeine Requirements
+            generiert.</small
+          >
+        </div>
 
         <div class="mb-3">
           <label class="form-label">Anzahl der Anforderungen</label>
@@ -72,7 +73,7 @@ endblock %} {% block content %}
         </div>
 
         <div class="mb-3">
-          <label class="form-label">Tabellenspalten</label>
+          <label class="form-label">Zusätzliche Spalten</label>
           <div id="custom-columns-container">
             <!-- Default columns that are always included -->
             <div class="input-group mb-2">
@@ -142,7 +143,8 @@ endblock %} {% block content %}
             {% endfor %}
           </select>
           <div class="form-text">
-            Wähle das KI-Modell für die Generierung.
+            Wähle das KI-Modell für die Generierung. Leistungsstärkere Modelle
+            bieten bessere Qualität, sind aber teurer.
           </div>
         </div>
 
