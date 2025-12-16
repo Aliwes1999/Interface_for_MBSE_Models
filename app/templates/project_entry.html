@@ -1,17 +1,32 @@
-{% extends "base.html" %} {% block title %}{{ project.name }} - Einstieg{%
-endblock %} {% block content %}
+{% extends "base.html" %}
+{% block title %}{{ project.name }} - Einstieg{% endblock %}
+
+{% block content %}
 <div class="container mt-5 pt-5">
   <h1 class="mb-5 text-center">Projekt: {{ project.name }}</h1>
 
+  {# Optional: Flash Messages anzeigen #}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mb-4">
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} mb-2" role="alert">
+            {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
   <div class="row">
-    <div class="col-md-6 mb-4">
+    <!-- 1) Agent -->
+    <div class="col-md-4 mb-4">
       <div class="card h-100 shadow-sm">
         <div class="card-body text-center">
-          <i class="bi bi-robot" style="font-size: 3rem; color: #0d6efd"></i>
+          <i class="bi bi-robot feature-icon text-primary"></i>
           <h5 class="card-title mt-3">Neue Anforderungen generieren</h5>
           <p class="card-text text-muted">
-            Verwende KI um neue Anforderungen zu erstellen oder bestehende zu
-            analysieren.
+            Verwende KI, um neue Anforderungen zu erstellen oder bestehende zu analysieren.
           </p>
           <a
             href="{{ url_for('agent.agent_page', project_id=project.id) }}"
@@ -23,13 +38,11 @@ endblock %} {% block content %}
       </div>
     </div>
 
-    <div class="col-md-6 mb-4">
+    <!-- 2) Excel optimieren (bestehende Funktion) -->
+    <div class="col-md-4 mb-4">
       <div class="card h-100 shadow-sm">
         <div class="card-body text-center">
-          <i
-            class="bi bi-file-earmark-excel"
-            style="font-size: 3rem; color: #198754"
-          ></i>
+          <i class="bi bi-file-earmark-excel feature-icon text-success"></i>
           <h5 class="card-title mt-3">Excel hochladen & optimieren</h5>
           <p class="card-text text-muted">
             Lade eine Excel-Datei hoch und lasse sie von der KI optimieren.
@@ -40,6 +53,26 @@ endblock %} {% block content %}
           >
             <i class="bi bi-upload"></i> Starten
           </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3) Excel erweitern (NEU: Upload + KI fügt Zeilen hinzu) -->
+    <div class="col-md-4 mb-4">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body text-center">
+          <i class="bi bi-magic feature-icon text-success"></i>
+          <h5 class="card-title mt-3">Excel hochladen & erweitern</h5>
+          <p class="card-text text-muted">
+            Lade eine Excel-Datei hoch. Die KI ergänzt zusätzliche Zeilen (neue Anforderungen).
+          </p>
+
+        <a
+          href="{{ url_for('agent.upload_page', project_id=project.id) }}"
+          class="btn btn-primary btn-lg w-100"
+        >
+          <i class="bi bi-upload"></i> Starten
+        </a>
         </div>
       </div>
     </div>
@@ -59,4 +92,13 @@ endblock %} {% block content %}
     </div>
   </div>
 </div>
+
+{# Kleine CSS-Hilfe ohne Inline-Styles #}
+<style>
+  .feature-icon {
+    font-size: 3rem;
+  }
+</style>
 {% endblock %}
+
+
