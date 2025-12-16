@@ -20,19 +20,15 @@ endblock %} {% block content %}
     <div class="card-body">
       <form id="agent-form">
         <div class="mb-3">
-          <label for="produktsystem" class="form-label">Produktsystem</label>
-          <input
-            type="text"
-            class="form-control"
-            id="produktsystem"
-            name="produktsystem"
-            placeholder="Gib hier den Namen des Produktsystems ein (z. B. „Montagesystem A“)."
-          />
-          <small class="form-text text-muted">
-            Optional: Auf welches Produktsystem beziehen sich die Anforderungen?
-          </small>
+          <label for="maschine" class="form-label">Maschine</label>
+          <input type="text" class="form-control" id="maschine" name="maschine"
+          placeholder="Gib hier den Maschinennamen oder die Maschine ein (z. B.
+          "Maschine A")." />
+          <small class="form-text text-muted"
+            >Optional: Auf welche Maschine beziehen sich die
+            Anforderungen?</small
+          >
         </div>
-
 
         <div class="mb-3">
           <label for="user_description" class="form-label"
