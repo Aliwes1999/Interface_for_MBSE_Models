@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+{% block title %}Excel erweitern (KI) - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <div class="mb-3">
+    <a
+      href="{{ url_for('main.manage_project', project_id=project.id) }}"
+      class="btn btn-secondary"
+    >
+      <i class="bi bi-arrow-left"></i> Zurück zum Projekt
+    </a>
+  </div>
+
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-2">
+    <div>
+      <h1 class="mb-2">Excel mit KI erweitern</h1>
+      <div class="text-muted">
+        Projekt: <strong>{{ project.name }}</strong>
+      </div>
+    </div>
+  </div>
+
+  <p class="mb-4">
+    Lade deine Excel-Datei hoch. Die KI analysiert die vorhandenen Anforderungen und
+    <strong>fügt neue Anforderungen direkt in die Tabelle hinzu</strong>.
+    Danach kannst du die <strong>erweiterte Excel</strong> herunterladen – optional kannst du die neuen Anforderungen auch direkt ins Projekt importieren.
+  </p>
+
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title mb-3">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Datei hochladen
+          </h5>
+
+          <form
+            id="upload-form"
+            method="POST"
+            action="{{ url_for('agent.upload_excel_route', project_id=project.id) }}"
+            enctype="multipart/form-data"
+          >
+            <div class="mb-3">
+              <label for="excel_file" class="form-label">Excel-Datei</label>
+              <input
+                type="file"
+                class="form-control"
+                id="excel_file"
+                name="excel_file"
+                accept=".xlsx,.xls"
+                required
+              />
+              <div class="form-text">
+                Enthält bereits vorhandene Anforderungen (z. B. als Tabelle mit ID, Titel, Beschreibung, Priorität …).
+              </div>
+            </div>
+
+
+            <div class="mb-3">
+              <label for="user_description" class="form-label">
+                Hinweise an die KI (optional)
+              </label>
+              <textarea
+                class="form-control"
+                id="user_description"
+                name="user_description"
+                rows="4"
+                placeholder="z. B. Fokus auf Sicherheit, Logging, Performance; gleiche Schreibweise wie bestehende Anforderungen; max. 20 neue Anforderungen …"
+              ></textarea>
+              <div class="form-text">
+                Hilft, damit die KI zielgerichtet erweitert (Stil, Domäne, Prioritäten, Umfang).
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="extension_mode" class="form-label">
+                <i class="bi bi-sliders"></i> Erweiterungsmodus
+              </label>
+              <select class="form-select" id="extension_mode" name="extension_mode">
+                <option value="append" selected>Neue Anforderungen ans Ende anhängen</option>
+                <option value="dedupe_append">Nur neue, nicht-duplizierte Anforderungen anhängen</option>
+                <option value="grouped_append">Neue Anforderungen thematisch gruppiert anhängen</option>
+              </select>
+              <div class="form-text">
+                Empfehlung: <strong>„Nur neue, nicht-duplizierte …“</strong> (reduziert Dopplungen).
+              </div>
+            </div>
+
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label for="max_new" class="form-label">Max. neue Anforderungen</label>
+                <input
+                  type="number"
+                  class="form-control"
+                  id="max_new"
+                  name="max_new"
+                  min="1"
+                  max="200"
+                  value="20"
+                />
+                <div class="form-text">Begrenzt den Umfang der Erweiterung.</div>
+              </div>
+              <div class="col-md-6">
+                <label for="min_quality" class="form-label">Qualitätsniveau</label>
+                <select class="form-select" id="min_quality" name="min_quality">
+                  <option value="standard" selected>Standard</option>
+                  <option value="high">Hoch (präziser, ggf. langsamer/teurer)</option>
+                </select>
+                <div class="form-text">Beeinflusst Detailgrad und Genauigkeit.</div>
+              </div>
+            </div>
+
+            <hr class="my-4" />
+
+            <div class="mb-3">
+              <label for="ai_model" class="form-label">
+                <i class="bi bi-cpu"></i> KI-Modell wählen
+              </label>
+              <select class="form-select" id="ai_model" name="ai_model">
+                {% for model in available_models %}
+                <option value="{{ model.id }}" {% if loop.first %}selected{% endif %}>
+                  {{ model.name }} - {{ model.description }}
+                </option>
+                {% endfor %}
+              </select>
+              <div class="form-text">
+                Leistungsstärkere Modelle liefern oft bessere Ergänzungen, sind aber teurer.
+              </div>
+            </div>
+
+            <div class="d-flex gap-2 flex-wrap">
+              <button type="submit" class="btn btn-primary" id="submit-btn">
+                <i class="bi bi-magic"></i> Excel erweitern
+              </button>
+              <button type="button" class="btn btn-outline-secondary" id="reset-btn">
+                <i class="bi bi-x-circle"></i> Zurücksetzen
+              </button>
+            </div>
+          </form>
+
+          <div id="upload-result" class="mt-3"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card border-0 bg-light">
+        <div class="card-body">
+          <h5 class="card-title mb-3">
+            <i class="bi bi-info-circle"></i> So läuft’s ab
+          </h5>
+
+          <ol class="mb-0">
+            <li class="mb-2">Du lädst eine Excel mit bestehenden Anforderungen hoch.</li>
+            <li class="mb-2">Die KI erkennt Muster, Lücken und Ergänzungen.</li>
+            <li class="mb-2">
+              Die KI <strong>fügt neue Anforderungen</strong> in die Tabelle ein (z. B. am Ende / gruppiert).
+            </li>
+            <li class="mb-0">
+              Du bekommst eine <strong>neue Excel-Datei</strong> zum Download – optional kannst du die neuen Anforderungen ins Projekt übernehmen.
+            </li>
+          </ol>
+
+          <hr class="my-3" />
+
+          <div class="small text-muted">
+            Tipp: Wenn du eine feste Spaltenstruktur hast (z. B. ID, Titel, Beschreibung, Priorität, Qualifizierbar, Funktional),
+            sag das im Hinweisfeld – dann bleibt das Format stabil.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const form = document.getElementById("upload-form");
+  const resultDiv = document.getElementById("upload-result");
+  const submitBtn = document.getElementById("submit-btn");
+  const resetBtn = document.getElementById("reset-btn");
+
+  resetBtn.addEventListener("click", () => {
+    form.reset();
+    resultDiv.className = "";
+    resultDiv.innerHTML = "";
+    submitBtn.disabled = false;
+  });
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+
+    submitBtn.disabled = true;
+    resultDiv.className = "alert alert-info";
+    resultDiv.innerHTML =
+      `<strong>Bitte warten…</strong> Die KI erweitert deine Excel-Datei.`;
+
+    const fd = new FormData(form);
+
+    fetch(form.action, {
+      method: "POST",
+      credentials: "same-origin",
+      body: fd,
+    })
+      .then((r) => r.json())
+      .then((result) => {
+        // Erwartete Backend-JSON-Idee (du kannst das anpassen):
+        // result.ok: boolean
+        // result.added_count: number
+        // result.download_url: string  (Route, die die erweiterte Datei ausliefert)
+        // optional: result.import_url (Route, um neue Anforderungen ins Projekt zu übernehmen)
+        // optional: result.redirect (wenn du weiterhin redirecten willst)
+
+        if (result.ok) {
+          const added = result.added_count ?? result.count ?? 0;
+
+          let html = `
+            <div class="d-flex flex-column gap-2">
+              <div><strong>Fertig!</strong> ${added} neue Anforderung(en) wurden zur Excel hinzugefügt.</div>
+          `;
+
+          if (result.download_url) {
+            html += `
+              <a class="btn btn-success" href="${result.download_url}">
+                <i class="bi bi-download"></i> Erweiterte Excel herunterladen
+              </a>
+            `;
+          }
+
+          // Optional: Import-Button (nur wenn Backend das anbietet)
+          if (result.import_url) {
+            html += `
+              <button class="btn btn-outline-primary" id="import-btn" type="button">
+                <i class="bi bi-box-arrow-in-down"></i> Neue Anforderungen ins Projekt übernehmen
+              </button>
+              <div class="small text-muted">
+                Importiert nur die neu hinzugefügten Zeilen, nicht die bereits vorhandenen.
+              </div>
+            `;
+          }
+
+          // Optional: Redirect beibehalten, wenn du das willst
+          if (result.redirect) {
+            html += `<div class="small text-muted">Weiterleitung…</div>`;
+          }
+
+          html += `</div>`;
+
+          resultDiv.className = "alert alert-success";
+          resultDiv.innerHTML = html;
+
+          // Import-Handler (optional)
+          const importBtn = document.getElementById("import-btn");
+          if (importBtn) {
+            importBtn.addEventListener("click", () => {
+              importBtn.disabled = true;
+              importBtn.innerHTML = `<i class="bi bi-hourglass-split"></i> Import läuft…`;
+
+              fetch(result.import_url, { method: "POST", credentials: "same-origin" })
+                .then((r) => r.json())
+                .then((imp) => {
+                  if (imp.ok) {
+                    importBtn.className = "btn btn-success";
+                    importBtn.innerHTML = `<i class="bi bi-check2-circle"></i> Import abgeschlossen (${imp.imported_count ?? 0})`;
+                  } else {
+                    importBtn.disabled = false;
+                    importBtn.className = "btn btn-outline-danger";
+                    importBtn.innerHTML = `<i class="bi bi-exclamation-triangle"></i> Import fehlgeschlagen`;
+                  }
+                })
+                .catch(() => {
+                  importBtn.disabled = false;
+                  importBtn.className = "btn btn-outline-danger";
+                  importBtn.innerHTML = `<i class="bi bi-exclamation-triangle"></i> Netzwerkfehler`;
+                });
+            });
+          }
+
+          if (result.redirect) {
+            setTimeout(() => {
+              window.location.href = result.redirect;
+            }, 1200);
+          }
+        } else {
+          resultDiv.className = "alert alert-danger";
+          resultDiv.innerHTML = `<strong>Fehler:</strong> ${result.error || "Unbekannter Fehler"}`;
+          submitBtn.disabled = false;
+        }
+      })
+      .catch((err) => {
+        resultDiv.className = "alert alert-danger";
+        resultDiv.innerHTML = `<strong>Netzwerkfehler:</strong> ${err.message}`;
+        submitBtn.disabled = false;
+      });
+  });
+</script>
+{% endblock %}

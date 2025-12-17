@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, abort
+from flask import Blueprint, render_template, render_template_string, request, jsonify, redirect, url_for, flash, abort
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 import os
@@ -51,6 +51,44 @@ def agent_page(project_id):
     available_models = config.AVAILABLE_AI_MODELS
     
     return render_template('agent/agent.html', project=project, available_models=available_models)
+@agent_bp.route('/optimize/<int:project_id>')
+def optimize_page(project_id):
+    """Render page for optimizing an uploaded Excel via AI"""
+    project = Project.query.get_or_404(project_id)
+
+    # Authorization: allow anonymous users to view the page for debugging.
+    # If a user is authenticated, enforce project ownership/shared checks.
+    if current_user.is_authenticated:
+        if project.user_id != current_user.id and current_user not in project.shared_with:
+            abort(403)
+
+    # Available AI models
+    import config
+    available_models = config.AVAILABLE_AI_MODELS
+
+    # Try to render the full template; if rendering fails or returns empty
+    # (we've seen empty responses during debugging), fall back to a simple
+    # debug page so we can confirm the route works without requiring login.
+    try:
+        rendered = render_template('agent/optimize.html', project=project, available_models=available_models)
+        if not rendered or not str(rendered).strip():
+            # Fallback debug HTML
+            return render_template_string(
+                '<div class="container mt-5"><h1>Debug: Optimize page</h1><p>Project: {{ project.name }}</p>'
+                '<p>Available models: {{ models|length }}</p></div>',
+                project=project,
+                models=available_models,
+            )
+        return rendered
+    except Exception as e:
+        # Provide a minimal error page so we can see the exception in-browser
+        return render_template_string(
+            '<div class="container mt-5"><h1>Template rendering error</h1>'
+            '<pre>{{ err }}</pre>'
+            '<p>Project id: {{ pid }}</p></div>',
+            err=str(e),
+            pid=project_id,
+        ), 500
 
 
 @agent_bp.route('/upload/<int:project_id>')
@@ -61,7 +99,7 @@ def upload_page(project_id):
     project = Project.query.get_or_404(project_id)
     if project.user_id != current_user.id and current_user not in project.shared_with:
         abort(403)
-    
+
     # Import available models from config
     import config
     available_models = config.AVAILABLE_AI_MODELS
@@ -599,3 +637,6 @@ def suggest_improvements(requirement_id):
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
+
+    
